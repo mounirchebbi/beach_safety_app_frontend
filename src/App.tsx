@@ -17,6 +17,7 @@ import RegisterPage from './components/auth/RegisterPage';
 
 // Public Pages
 import PublicDashboard from './components/public/PublicDashboard';
+import MapPage from './components/map/MapPage';
 
 // Lifeguard Pages
 import LifeguardDashboard from './components/lifeguard/LifeguardDashboard';
@@ -135,6 +136,7 @@ const AppContent: React.FC = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/" element={<PublicDashboard />} />
+        <Route path="/map" element={<MapPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -146,6 +148,7 @@ const AppContent: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<PublicDashboard />} />
+        <Route path="/map" element={<MapPage />} />
 
         {/* Lifeguard Routes */}
         <Route

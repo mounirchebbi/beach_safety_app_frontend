@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, LoginCredentials, RegisterData } from '../types';
+import { User, LoginCredentials, RegisterData, AuthResponse } from '../types';
 import apiService from '../services/api';
 import socketService from '../services/socket';
 
@@ -8,8 +8,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
+  register: (userData: RegisterData) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -77,6 +77,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         socketService.connect(response.token);
         socketService.joinCenter(response.user.center_info.id);
       }
+      
+      return response;
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed');
       throw err;
@@ -103,6 +105,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         socketService.connect(response.token);
         socketService.joinCenter(response.user.center_info.id);
       }
+      
+      return response;
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed');
       throw err;

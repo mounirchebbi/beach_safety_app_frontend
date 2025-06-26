@@ -55,8 +55,18 @@ const LoginPage: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       clearError();
-      await login(data);
-      // Navigation will be handled by the AuthContext
+      const response = await login(data);
+      
+      // Navigate based on user role
+      if (response.user.role === 'system_admin') {
+        navigate('/system');
+      } else if (response.user.role === 'center_admin') {
+        navigate('/admin');
+      } else if (response.user.role === 'lifeguard') {
+        navigate('/lifeguard');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       // Error is handled by the AuthContext
     }
