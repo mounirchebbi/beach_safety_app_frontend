@@ -92,12 +92,18 @@ export interface WeatherData {
   id: string;
   center_id: string;
   temperature?: number;
+  feels_like?: number;
+  humidity?: number;
+  pressure?: number;
   wind_speed?: number;
   wind_direction?: number;
   precipitation?: number;
   wave_height?: number;
   current_speed?: number;
   visibility?: number;
+  weather_condition?: string;
+  sunrise?: string;
+  sunset?: string;
   recorded_at: string;
   created_at: string;
 }

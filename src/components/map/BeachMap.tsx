@@ -227,7 +227,7 @@ const BeachMap: React.FC<BeachMapProps> = ({
           <Marker
             key={center.id}
             position={[center.location.lat, center.location.lng]}
-            icon={lifeguardIcon}
+            icon={centerIcon}
             eventHandlers={{
               click: () => onCenterClick?.(center),
             }}

@@ -31,6 +31,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const initializeAuth = async () => {
       try {
         const token = localStorage.getItem('token');
+        
         if (token) {
           const currentUser = await apiService.getCurrentUser();
           setUser(currentUser);
@@ -46,9 +47,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             socketService.connect(token);
             socketService.joinCenter(currentUser.center_info.id);
           }
+        } else {
+          // No token found, user will be unauthenticated
         }
-      } catch (err) {
-        console.error('Failed to initialize auth:', err);
+      } catch (error) {
+        // Token is invalid or expired, clear it
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       } finally {

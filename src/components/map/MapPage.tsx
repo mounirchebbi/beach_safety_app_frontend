@@ -35,105 +35,157 @@ import {
 } from '@mui/icons-material';
 import BeachMap from './BeachMap';
 import MapControls from './MapControls';
+import apiService from '../../services/api';
+import { Center, EmergencyAlert } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
-// Sample data for demonstration
-const sampleCenters = [
-  {
-    id: '1',
-    name: 'South Beach Lifeguard Station',
-    location: { lat: 25.7617, lng: -80.1918 },
-    status: 'open' as const,
-    lifeguards_on_duty: 4,
-    weather_condition: 'Sunny',
-    water_temperature: 26,
-    air_temperature: 28,
-    wind_speed: 15,
-    visibility: 10,
-  },
-  {
-    id: '2',
-    name: 'North Beach Safety Center',
-    location: { lat: 25.8517, lng: -80.1218 },
-    status: 'warning' as const,
-    lifeguards_on_duty: 2,
-    weather_condition: 'Partly Cloudy',
-    water_temperature: 25,
-    air_temperature: 27,
-    wind_speed: 20,
-    visibility: 8,
-  },
-  {
-    id: '3',
-    name: 'Mid-Beach Patrol Station',
-    location: { lat: 25.8017, lng: -80.1518 },
-    status: 'open' as const,
-    lifeguards_on_duty: 3,
-    weather_condition: 'Clear',
-    water_temperature: 27,
-    air_temperature: 29,
-    wind_speed: 12,
-    visibility: 12,
-  },
-];
+// Transform center data to match BeachMap interface
+interface BeachCenter {
+  id: string;
+  name: string;
+  location: {
+    lat: number;
+    lng: number;
+  };
+  status: 'open' | 'closed' | 'warning';
+  lifeguards_on_duty: number;
+  weather_condition: string;
+  water_temperature: number;
+  air_temperature: number;
+  wind_speed: number;
+  visibility: number;
+}
 
-const sampleAlerts = [
-  {
-    id: '1',
-    center_id: '1',
-    type: 'sos' as const,
-    location: { lat: 25.7617, lng: -80.1918 },
-    description: 'Swimmer in distress reported',
-    status: 'active' as const,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    center_id: '2',
-    type: 'weather' as const,
-    location: { lat: 25.8517, lng: -80.1218 },
-    description: 'Strong currents detected',
-    status: 'active' as const,
-    created_at: new Date(Date.now() - 300000).toISOString(),
-  },
-];
-
-const sampleSafetyZones = [
-  {
-    id: '1',
-    center_id: '1',
-    location: { lat: 25.7617, lng: -80.1918 },
-    radius: 500,
-    type: 'swimming' as const,
-    description: 'Designated swimming area with lifeguard supervision',
-  },
-  {
-    id: '2',
-    center_id: '2',
-    location: { lat: 25.8517, lng: -80.1218 },
-    radius: 300,
-    type: 'restricted' as const,
-    description: 'Dangerous currents - swimming not recommended',
-  },
-  {
-    id: '3',
-    center_id: '3',
-    location: { lat: 25.8017, lng: -80.1518 },
-    radius: 400,
-    type: 'surfing' as const,
-    description: 'Surfing zone with moderate waves',
-  },
-];
+// Transform alert data to match BeachMap interface
+interface MapAlert {
+  id: string;
+  center_id: string;
+  type: 'sos' | 'medical' | 'weather' | 'safety';
+  location: {
+    lat: number;
+    lng: number;
+  };
+  description: string;
+  status: 'active' | 'resolved';
+  created_at: string;
+}
 
 const MapPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [showUserLocation, setShowUserLocation] = useState(true);
   const [showSafetyZones, setShowSafetyZones] = useState(true);
   const [showAlerts, setShowAlerts] = useState(true);
   const [showCenters, setShowCenters] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [selectedCenter, setSelectedCenter] = useState<any>(null);
-  const [selectedAlert, setSelectedAlert] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [selectedCenter, setSelectedCenter] = useState<BeachCenter | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<MapAlert | null>(null);
+  const [loading, setLoading] = useState(true);
   const [mapView, setMapView] = useState<'satellite' | 'street' | 'hybrid'>('street');
+  
+  // Real data from API
+  const [centers, setCenters] = useState<BeachCenter[]>([]);
+  const [alerts, setAlerts] = useState<MapAlert[]>([]);
+  const [weatherData, setWeatherData] = useState<any>({});
+
+  // Fetch centers and their data
+  const fetchCentersData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch all centers
+      const centersData = await apiService.getPublicCenters();
+      
+      // Fetch current weather for all centers (public endpoint)
+      let weatherData: any[] = [];
+      try {
+        weatherData = await apiService.getCurrentWeather();
+      } catch (error) {
+        console.log('Could not fetch weather data:', error);
+      }
+      
+      // Transform centers data and fetch additional info
+      const transformedCenters = await Promise.all(
+        centersData.map(async (center: Center) => {
+          const location = {
+            lat: center.location.coordinates[1],
+            lng: center.location.coordinates[0]
+          };
+
+          // Find weather data for this center
+          const centerWeather = weatherData.find(w => w.center_id === center.id);
+          let weatherInfo = {
+            weather_condition: 'Unknown',
+            water_temperature: 0,
+            air_temperature: 0,
+            wind_speed: 0,
+            visibility: 0
+          };
+
+          if (centerWeather) {
+            weatherInfo = {
+              weather_condition: centerWeather.weather_condition || 'Unknown',
+              water_temperature: centerWeather.temperature || 0,
+              air_temperature: centerWeather.temperature || 0,
+              wind_speed: centerWeather.wind_speed || 0,
+              visibility: centerWeather.visibility || 0
+            };
+          }
+
+          // Get lifeguard count for this center (only if authenticated)
+          let lifeguardCount = 0;
+          if (isAuthenticated) {
+            try {
+              const lifeguards = await apiService.getCenterLifeguards(center.id);
+              lifeguardCount = lifeguards.length;
+            } catch (error) {
+              console.log(`Could not fetch lifeguards for center ${center.id}:`, error);
+            }
+          }
+
+          return {
+            id: center.id,
+            name: center.name,
+            location,
+            status: 'open' as const, // Default status, could be enhanced with real status
+            lifeguards_on_duty: lifeguardCount,
+            ...weatherInfo
+          };
+        })
+      );
+
+      setCenters(transformedCenters);
+      
+      // Fetch alerts (only if authenticated)
+      if (isAuthenticated) {
+        try {
+          const alertsData = await apiService.getAlerts();
+          const transformedAlerts: MapAlert[] = alertsData.map((alert: EmergencyAlert) => ({
+            id: alert.id,
+            center_id: alert.center_id,
+            type: alert.alert_type as 'sos' | 'medical' | 'weather' | 'safety',
+            location: {
+              lat: alert.location.coordinates[1],
+              lng: alert.location.coordinates[0]
+            },
+            description: alert.description || 'No description available',
+            status: alert.status as 'active' | 'resolved',
+            created_at: alert.created_at
+          }));
+          setAlerts(transformedAlerts);
+        } catch (error) {
+          console.log('Could not fetch alerts:', error);
+          setAlerts([]);
+        }
+      } else {
+        setAlerts([]);
+      }
+
+    } catch (error) {
+      console.error('Error fetching centers data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get user location on component mount
   useEffect(() => {
@@ -152,11 +204,16 @@ const MapPage: React.FC = () => {
     }
   }, []);
 
-  const handleCenterClick = (center: any) => {
+  // Fetch centers data on component mount
+  useEffect(() => {
+    fetchCentersData();
+  }, []);
+
+  const handleCenterClick = (center: BeachCenter) => {
     setSelectedCenter(center);
   };
 
-  const handleAlertClick = (alert: any) => {
+  const handleAlertClick = (alert: MapAlert) => {
     setSelectedAlert(alert);
   };
 
@@ -168,11 +225,7 @@ const MapPage: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    fetchCentersData();
   };
 
   const getStatusColor = (status: string) => {
@@ -199,62 +252,203 @@ const MapPage: React.FC = () => {
 
   const formatTimeAgo = (date: Date) => {
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
     
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}d ago`;
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
   return (
-    <Box sx={{ p: 3, height: '100vh', overflow: 'hidden' }}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 3 }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h4" fontWeight="bold">
-              Beach Safety Map
-            </Typography>
-            <Chip 
-              label="Live" 
-              color="success" 
-              size="small" 
-              icon={<CheckCircle />}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Refresh Data">
-              <IconButton onClick={handleRefresh} disabled={loading}>
-                {loading ? <CircularProgress size={20} /> : <Refresh />}
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Fullscreen">
-              <IconButton>
-                <Fullscreen />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Settings">
-              <IconButton>
-                <Settings />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Beach Safety Map
+      </Typography>
+      
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        Monitor beach safety centers, lifeguard stations, and emergency alerts in real-time.
+      </Typography>
 
-        {/* Main Content */}
-        <Box sx={{ display: 'flex', gap: 3, flex: 1, minHeight: 0 }}>
-          {/* Map */}
-          <Box sx={{ flex: '0 0 66.666%' }}>
-            <Paper elevation={2} sx={{ position: 'relative', overflow: 'hidden', height: '100%' }}>
+      <Grid container spacing={3}>
+        {/* Map Controls */}
+        <Grid item xs={12} md={3}>
+          <Paper sx={{ p: 2, mb: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Map Controls
+            </Typography>
+            
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showUserLocation}
+                  onChange={(e) => setShowUserLocation(e.target.checked)}
+                />
+              }
+              label="Show My Location"
+            />
+            
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showCenters}
+                  onChange={(e) => setShowCenters(e.target.checked)}
+                />
+              }
+              label="Show Centers"
+            />
+            
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showAlerts}
+                  onChange={(e) => setShowAlerts(e.target.checked)}
+                />
+              }
+              label="Show Alerts"
+            />
+            
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showSafetyZones}
+                  onChange={(e) => setShowSafetyZones(e.target.checked)}
+                />
+              }
+              label="Show Safety Zones"
+            />
+
+            <Box sx={{ mt: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                onClick={handleRefresh}
+                disabled={loading}
+                fullWidth
+              >
+                {loading ? <CircularProgress size={20} /> : 'Refresh Data'}
+              </Button>
+            </Box>
+          </Paper>
+
+          {/* Centers List */}
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Beach Centers ({centers.length})
+            </Typography>
+            
+            {loading ? (
+              <Box display="flex" justifyContent="center" p={2}>
+                <CircularProgress />
+              </Box>
+            ) : centers.length > 0 ? (
+              <List dense>
+                {centers.map((center) => (
+                  <ListItem
+                    key={center.id}
+                    button
+                    onClick={() => handleCenterClick(center)}
+                    sx={{ border: 1, borderColor: 'divider', borderRadius: 1, mb: 1 }}
+                  >
+                    <ListItemIcon>
+                      <LocationOn color="primary" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={center.name}
+                      secondary={
+                        <Box>
+                          <Chip
+                            label={center.status.toUpperCase()}
+                            color={getStatusColor(center.status) as any}
+                            size="small"
+                            sx={{ mr: 1 }}
+                          />
+                          <Typography variant="caption" display="block">
+                            Lifeguards: {center.lifeguards_on_duty} | Weather: {center.weather_condition}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Alert severity="info">
+                No beach centers found
+              </Alert>
+            )}
+          </Paper>
+
+          {/* Alerts List */}
+          {alerts.length > 0 && (
+            <Paper sx={{ p: 2, mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Active Alerts ({alerts.filter(a => a.status === 'active').length})
+              </Typography>
+              
+              <List dense>
+                {alerts.filter(alert => alert.status === 'active').map((alert) => (
+                  <ListItem
+                    key={alert.id}
+                    button
+                    onClick={() => handleAlertClick(alert)}
+                    sx={{ border: 1, borderColor: 'divider', borderRadius: 1, mb: 1 }}
+                  >
+                    <ListItemIcon>
+                      <Warning color="error" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={`${alert.type.toUpperCase()} Alert`}
+                      secondary={
+                        <Box>
+                          <Typography variant="body2" noWrap>
+                            {alert.description}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatTimeAgo(new Date(alert.created_at))}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          )}
+        </Grid>
+
+        {/* Map */}
+        <Grid item xs={12} md={9}>
+          <Paper sx={{ p: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">
+                Interactive Safety Map
+              </Typography>
+              
+              <Box>
+                <Tooltip title="Center on my location">
+                  <IconButton onClick={handleCenterMap} disabled={!userLocation}>
+                    <LocationOn />
+                  </IconButton>
+                </Tooltip>
+                
+                <Tooltip title="Refresh data">
+                  <IconButton onClick={handleRefresh} disabled={loading}>
+                    <Refresh />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+
+            {loading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
+                <CircularProgress />
+              </Box>
+            ) : (
               <BeachMap
-                centers={showCenters ? sampleCenters : []}
-                alerts={showAlerts ? sampleAlerts : []}
-                safetyZones={showSafetyZones ? sampleSafetyZones : []}
+                centers={showCenters ? centers : []}
+                alerts={showAlerts ? alerts : []}
+                safetyZones={[]} // Could be enhanced with real safety zones
                 userLocation={userLocation || undefined}
                 onCenterClick={handleCenterClick}
                 onAlertClick={handleAlertClick}
@@ -263,132 +457,10 @@ const MapPage: React.FC = () => {
                 showAlerts={showAlerts}
                 view={mapView}
               />
-              <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
-                <MapControls
-                  showUserLocation={showUserLocation}
-                  showSafetyZones={showSafetyZones}
-                  showAlerts={showAlerts}
-                  showCenters={showCenters}
-                  mapView={mapView}
-                  onToggleUserLocation={() => setShowUserLocation(!showUserLocation)}
-                  onToggleSafetyZones={() => setShowSafetyZones(!showSafetyZones)}
-                  onToggleAlerts={() => setShowAlerts(!showAlerts)}
-                  onToggleCenters={() => setShowCenters(!showCenters)}
-                  onCenterMap={handleCenterMap}
-                  onViewChange={setMapView}
-                />
-              </Box>
-            </Paper>
-          </Box>
-
-          {/* Sidebar */}
-          <Box sx={{ flex: '0 0 33.333%', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Status Summary */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Status Summary
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                  <Chip 
-                    label={`${sampleCenters.filter(c => c.status === 'open').length} Active`}
-                    color={getStatusColor('open')}
-                    size="small"
-                  />
-                  <Chip 
-                    label={`${sampleAlerts.length} Alerts`}
-                    color={getStatusColor('warning')}
-                    size="small"
-                  />
-                  <Chip 
-                    label={`${sampleCenters.reduce((sum, c) => sum + c.lifeguards_on_duty, 0)} Lifeguards`}
-                    color={getStatusColor('maintenance')}
-                    size="small"
-                  />
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Layer Controls */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Map Layers
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={showCenters}
-                        onChange={(e) => setShowCenters(e.target.checked)}
-                        size="small"
-                      />
-                    }
-                    label="Safety Centers"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={showAlerts}
-                        onChange={(e) => setShowAlerts(e.target.checked)}
-                        size="small"
-                      />
-                    }
-                    label="Active Alerts"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={showSafetyZones}
-                        onChange={(e) => setShowSafetyZones(e.target.checked)}
-                        size="small"
-                      />
-                    }
-                    label="Safety Zones"
-                  />
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Active Alerts */}
-            <Card sx={{ flex: 1, overflow: 'hidden' }}>
-              <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Typography variant="h6" gutterBottom>
-                  Active Alerts
-                </Typography>
-                <List sx={{ flex: 1, overflow: 'auto' }}>
-                  {sampleAlerts.map((alert, index) => (
-                    <React.Fragment key={alert.id}>
-                      <ListItem>
-                        <ListItemIcon>
-                          <Warning color={getSeverityColor(alert.type) as any} />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={alert.description}
-                          secondary={
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">
-                                {alert.location.lat}, {alert.location.lng} • {formatTimeAgo(new Date(alert.created_at))}
-                              </Typography>
-                              <Chip 
-                                label={alert.type.toUpperCase()}
-                                color={getSeverityColor(alert.type) as any}
-                                size="small"
-                                sx={{ mt: 0.5 }}
-                              />
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                      {index < sampleAlerts.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))}
-                </List>
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-      </Box>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
 
       {/* Center Details Dialog */}
       <Dialog
@@ -397,46 +469,84 @@ const MapPage: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
-          <Typography variant="h6" fontWeight="bold">
-            {selectedCenter?.name}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          {selectedCenter && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Chip
-                icon={selectedCenter.status === 'open' ? <CheckCircle /> : <Warning />}
-                label={selectedCenter.status.toUpperCase()}
-                color={getStatusColor(selectedCenter.status)}
-              />
-              
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography variant="body2">
-                  <strong>Lifeguards on Duty:</strong> {selectedCenter.lifeguards_on_duty}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Weather:</strong> {selectedCenter.weather_condition}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Water Temperature:</strong> {selectedCenter.water_temperature}°C
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Air Temperature:</strong> {selectedCenter.air_temperature}°C
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Wind Speed:</strong> {selectedCenter.wind_speed} km/h
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Visibility:</strong> {selectedCenter.visibility} km
-                </Typography>
+        {selectedCenter && (
+          <>
+            <DialogTitle>
+              <Box display="flex" alignItems="center">
+                <LocationOn color="primary" sx={{ mr: 1 }} />
+                {selectedCenter.name}
               </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSelectedCenter(null)}>Close</Button>
-        </DialogActions>
+            </DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Chip
+                    label={selectedCenter.status.toUpperCase()}
+                    color={getStatusColor(selectedCenter.status) as any}
+                    icon={<CheckCircle />}
+                  />
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Lifeguards on Duty
+                  </Typography>
+                  <Typography variant="h6">
+                    {selectedCenter.lifeguards_on_duty}
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Weather Condition
+                  </Typography>
+                  <Typography variant="h6">
+                    {selectedCenter.weather_condition}
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Air Temperature
+                  </Typography>
+                  <Typography variant="h6">
+                    {selectedCenter.air_temperature}°C
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Water Temperature
+                  </Typography>
+                  <Typography variant="h6">
+                    {selectedCenter.water_temperature}°C
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Wind Speed
+                  </Typography>
+                  <Typography variant="h6">
+                    {selectedCenter.wind_speed} km/h
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Visibility
+                  </Typography>
+                  <Typography variant="h6">
+                    {selectedCenter.visibility} km
+                  </Typography>
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSelectedCenter(null)}>Close</Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
 
       {/* Alert Details Dialog */}
@@ -446,32 +556,34 @@ const MapPage: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
-          <Typography variant="h6" fontWeight="bold">
-            {selectedAlert?.type.toUpperCase()} Alert
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          {selectedAlert && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {selectedAlert && (
+          <>
+            <DialogTitle>
+              <Box display="flex" alignItems="center">
+                <Warning color="error" sx={{ mr: 1 }} />
+                {selectedAlert.type.toUpperCase()} Alert
+              </Box>
+            </DialogTitle>
+            <DialogContent>
               <Chip
                 label={selectedAlert.status.toUpperCase()}
                 color={selectedAlert.status === 'active' ? 'error' : 'success'}
+                sx={{ mb: 2 }}
               />
               
-              <Typography variant="body1">
+              <Typography variant="body1" paragraph>
                 {selectedAlert.description}
               </Typography>
               
               <Typography variant="caption" color="text.secondary">
-                Created: {new Date(selectedAlert.created_at).toLocaleString()}
+                Reported: {new Date(selectedAlert.created_at).toLocaleString()}
               </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSelectedAlert(null)}>Close</Button>
-        </DialogActions>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSelectedAlert(null)}>Close</Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );

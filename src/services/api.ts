@@ -51,9 +51,13 @@ class ApiService {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
+          // Don't redirect for authentication endpoints
+          const isAuthEndpoint = error.config?.url?.includes('/auth/');
+          if (!isAuthEndpoint) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       }

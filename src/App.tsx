@@ -142,7 +142,6 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Render different layouts based on user role
   return (
     <Layout>
       <Routes>
