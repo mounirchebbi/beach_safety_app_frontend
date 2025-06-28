@@ -195,23 +195,23 @@ class ApiService {
   }
 
   // Shifts
-  async getShifts(): Promise<Shift[]> {
-    const response: AxiosResponse<PaginatedResponse<Shift>> = await this.api.get('/api/v1/shifts');
+  async getShifts(): Promise<any[]> {
+    const response: AxiosResponse<PaginatedResponse<any>> = await this.api.get('/api/v1/shifts');
     return response.data.data;
   }
 
-  async getShiftById(id: string): Promise<Shift> {
-    const response: AxiosResponse<ApiResponse<Shift>> = await this.api.get(`/api/v1/shifts/${id}`);
+  async getShiftById(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/api/v1/shifts/${id}`);
     return response.data.data!;
   }
 
-  async createShift(shiftData: ShiftFormData): Promise<Shift> {
-    const response: AxiosResponse<ApiResponse<Shift>> = await this.api.post('/api/v1/shifts', shiftData);
+  async createShift(shiftData: ShiftFormData): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/shifts', shiftData);
     return response.data.data!;
   }
 
-  async updateShift(id: string, shiftData: Partial<ShiftFormData>): Promise<Shift> {
-    const response: AxiosResponse<ApiResponse<Shift>> = await this.api.put(`/api/v1/shifts/${id}`, shiftData);
+  async updateShift(id: string, shiftData: Partial<ShiftFormData>): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/shifts/${id}`, shiftData);
     return response.data.data!;
   }
 
@@ -219,13 +219,13 @@ class ApiService {
     await this.api.delete(`/api/v1/shifts/${id}`);
   }
 
-  async checkInShift(id: string, location: { lat: number; lng: number }): Promise<Shift> {
-    const response: AxiosResponse<ApiResponse<Shift>> = await this.api.post(`/api/v1/shifts/${id}/check-in`, { location });
+  async checkInShift(id: string, location: { lat: number; lng: number }): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/api/v1/shifts/${id}/check-in`, { location });
     return response.data.data!;
   }
 
-  async checkOutShift(id: string): Promise<Shift> {
-    const response: AxiosResponse<ApiResponse<Shift>> = await this.api.post(`/api/v1/shifts/${id}/check-out`);
+  async checkOutShift(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/api/v1/shifts/${id}/check-out`);
     return response.data.data!;
   }
 
