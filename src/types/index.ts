@@ -76,6 +76,7 @@ export interface Shift {
   check_out_time?: string;
   created_at: string;
   updated_at: string;
+  center_name?: string;
   lifeguard: {
     id: string;
     user: {

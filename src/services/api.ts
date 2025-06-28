@@ -229,6 +229,11 @@ class ApiService {
     return response.data.data!;
   }
 
+  async getMyShifts(): Promise<Shift[]> {
+    const response: AxiosResponse<{ success: boolean; count: number; data: Shift[] }> = await this.api.get('/api/v1/shifts/my-shifts');
+    return response.data.data;
+  }
+
   // Weather
   async getCurrentWeatherForCenter(centerId: string): Promise<WeatherData> {
     const response: AxiosResponse<ApiResponse<WeatherData>> = await this.api.get(`/api/v1/weather/centers/${centerId}/current`);
