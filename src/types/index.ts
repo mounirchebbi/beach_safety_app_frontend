@@ -251,6 +251,23 @@ export interface IncidentReportFormData {
   involved_persons?: any;
 }
 
+export interface LifeguardFormData {
+  email: string;
+  password?: string; // Optional for updates
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  certification_level?: string;
+  certification_expiry?: string;
+  emergency_contact?: {
+    name: string;
+    relationship: string;
+    phone: string;
+    email?: string;
+  };
+  is_active?: boolean;
+}
+
 // UI State Types
 export interface AppState {
   user: User | null;

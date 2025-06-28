@@ -126,8 +126,8 @@ class ApiService {
     await this.api.delete(`/api/v1/centers/${id}`);
   }
 
-  async getCenterLifeguards(centerId: string): Promise<Lifeguard[]> {
-    const response: AxiosResponse<PaginatedResponse<Lifeguard>> = await this.api.get(`/api/v1/centers/${centerId}/lifeguards`);
+  async getCenterLifeguards(centerId: string): Promise<any[]> {
+    const response: AxiosResponse<PaginatedResponse<any>> = await this.api.get(`/api/v1/centers/${centerId}/lifeguards`);
     return response.data.data;
   }
 
@@ -165,23 +165,23 @@ class ApiService {
   }
 
   // Lifeguards
-  async getLifeguards(): Promise<Lifeguard[]> {
-    const response: AxiosResponse<PaginatedResponse<Lifeguard>> = await this.api.get('/api/v1/lifeguards');
+  async getLifeguards(): Promise<any[]> {
+    const response: AxiosResponse<PaginatedResponse<any>> = await this.api.get('/api/v1/lifeguards');
     return response.data.data;
   }
 
-  async getLifeguardById(id: string): Promise<Lifeguard> {
-    const response: AxiosResponse<ApiResponse<Lifeguard>> = await this.api.get(`/api/v1/lifeguards/${id}`);
+  async getLifeguardById(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/api/v1/lifeguards/${id}`);
     return response.data.data!;
   }
 
-  async createLifeguard(lifeguardData: any): Promise<Lifeguard> {
-    const response: AxiosResponse<ApiResponse<Lifeguard>> = await this.api.post('/api/v1/lifeguards', lifeguardData);
+  async createLifeguard(lifeguardData: any): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/lifeguards', lifeguardData);
     return response.data.data!;
   }
 
-  async updateLifeguard(id: string, lifeguardData: any): Promise<Lifeguard> {
-    const response: AxiosResponse<ApiResponse<Lifeguard>> = await this.api.put(`/api/v1/lifeguards/${id}`, lifeguardData);
+  async updateLifeguard(id: string, lifeguardData: any): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/lifeguards/${id}`, lifeguardData);
     return response.data.data!;
   }
 
