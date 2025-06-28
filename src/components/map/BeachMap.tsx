@@ -50,6 +50,10 @@ interface BeachCenter {
   air_temperature: number;
   wind_speed: number;
   visibility: number;
+  wave_height: number;
+  current_speed: number;
+  flag_status: 'green' | 'yellow' | 'red' | 'black';
+  flag_reason?: string;
 }
 
 interface EmergencyAlert {
@@ -200,6 +204,26 @@ const BeachMap: React.FC<BeachMapProps> = ({
     }
   };
 
+  const getFlagColor = (flagStatus: string) => {
+    switch (flagStatus) {
+      case 'green': return '#4caf50';
+      case 'yellow': return '#ff9800';
+      case 'red': return '#f44336';
+      case 'black': return '#000000';
+      default: return '#4caf50';
+    }
+  };
+
+  const getFlagText = (flagStatus: string) => {
+    switch (flagStatus) {
+      case 'green': return 'SAFE TO SWIM';
+      case 'yellow': return 'CAUTION';
+      case 'red': return 'DANGEROUS CONDITIONS';
+      case 'black': return 'BEACH CLOSED';
+      default: return 'SAFE TO SWIM';
+    }
+  };
+
   return (
     <Box sx={{ width: '100%', height: '600px', position: 'relative' }}>
       <MapContainer
@@ -233,10 +257,29 @@ const BeachMap: React.FC<BeachMapProps> = ({
             }}
           >
             <Popup>
-              <Box sx={{ minWidth: 200 }}>
+              <Box sx={{ minWidth: 250 }}>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   {center.name}
                 </Typography>
+                
+                {/* Safety Flag Status - Main Info */}
+                <Box sx={{ 
+                  mb: 2, 
+                  p: 1.5, 
+                  borderRadius: 1, 
+                  backgroundColor: getFlagColor(center.flag_status),
+                  color: 'white',
+                  textAlign: 'center'
+                }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    {getFlagText(center.flag_status)}
+                  </Typography>
+                  {center.flag_reason && (
+                    <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
+                      {center.flag_reason}
+                    </Typography>
+                  )}
+                </Box>
                 
                 <Chip
                   icon={getStatusIcon(center.status)}
@@ -266,8 +309,16 @@ const BeachMap: React.FC<BeachMapProps> = ({
                   <strong>Wind:</strong> {center.wind_speed} km/h
                 </Typography>
                 
-                <Typography variant="body2">
+                <Typography variant="body2" gutterBottom>
                   <strong>Visibility:</strong> {center.visibility} km
+                </Typography>
+
+                <Typography variant="body2" gutterBottom>
+                  <strong>Wave Height:</strong> {center.wave_height} m
+                </Typography>
+                
+                <Typography variant="body2">
+                  <strong>Current Speed:</strong> {center.current_speed} m/s
                 </Typography>
               </Box>
             </Popup>

@@ -54,6 +54,10 @@ interface BeachCenter {
   air_temperature: number;
   wind_speed: number;
   visibility: number;
+  wave_height: number;
+  current_speed: number;
+  flag_status: 'green' | 'yellow' | 'red' | 'black';
+  flag_reason?: string;
 }
 
 // Transform alert data to match BeachMap interface
@@ -102,6 +106,22 @@ const MapPage: React.FC = () => {
       } catch (error) {
         console.log('Could not fetch weather data:', error);
       }
+
+      // Fetch lifeguard counts for all centers (public endpoint)
+      let lifeguardCounts: any[] = [];
+      try {
+        lifeguardCounts = await apiService.getPublicLifeguardCounts();
+      } catch (error) {
+        console.log('Could not fetch lifeguard counts:', error);
+      }
+
+      // Fetch safety flags for all centers (public endpoint)
+      let safetyFlags: any[] = [];
+      try {
+        safetyFlags = await apiService.getPublicSafetyFlags();
+      } catch (error) {
+        console.log('Could not fetch safety flags:', error);
+      }
       
       // Transform centers data and fetch additional info
       const transformedCenters = await Promise.all(
@@ -111,36 +131,42 @@ const MapPage: React.FC = () => {
             lng: center.location.coordinates[0]
           };
 
-          // Find weather data for this center
-          const centerWeather = weatherData.find(w => w.center_id === center.id);
+          // Find weather data for this center - get the most recent one
+          const centerWeatherRecords = weatherData.filter(w => w.center_id === center.id);
+          const centerWeather = centerWeatherRecords.length > 0 
+            ? centerWeatherRecords.sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0]
+            : null;
+          
           let weatherInfo = {
             weather_condition: 'Unknown',
             water_temperature: 0,
             air_temperature: 0,
             wind_speed: 0,
-            visibility: 0
+            visibility: 0,
+            wave_height: 0,
+            current_speed: 0
           };
 
           if (centerWeather) {
             weatherInfo = {
               weather_condition: centerWeather.weather_condition || 'Unknown',
-              water_temperature: centerWeather.temperature || 0,
-              air_temperature: centerWeather.temperature || 0,
-              wind_speed: centerWeather.wind_speed || 0,
-              visibility: centerWeather.visibility || 0
+              water_temperature: parseFloat(centerWeather.temperature) || 0,
+              air_temperature: parseFloat(centerWeather.temperature) || 0,
+              wind_speed: parseFloat(centerWeather.wind_speed) || 0,
+              visibility: parseFloat(centerWeather.visibility) || 0,
+              wave_height: parseFloat(centerWeather.wave_height) || 0,
+              current_speed: parseFloat(centerWeather.current_speed) || 0
             };
           }
 
-          // Get lifeguard count for this center (only if authenticated)
-          let lifeguardCount = 0;
-          if (isAuthenticated) {
-            try {
-              const lifeguards = await apiService.getCenterLifeguards(center.id);
-              lifeguardCount = lifeguards.length;
-            } catch (error) {
-              console.log(`Could not fetch lifeguards for center ${center.id}:`, error);
-            }
-          }
+          // Get lifeguard count for this center from public endpoint
+          const centerLifeguardData = lifeguardCounts.find(l => l.center_id === center.id);
+          const lifeguardCount = centerLifeguardData ? centerLifeguardData.lifeguard_count : 0;
+
+          // Get safety flag for this center from public endpoint
+          const centerFlagData = safetyFlags.find(f => f.center_id === center.id);
+          const flagStatus = centerFlagData ? centerFlagData.flag_status : 'green';
+          const flagReason = centerFlagData ? centerFlagData.reason : undefined;
 
           return {
             id: center.id,
@@ -148,6 +174,8 @@ const MapPage: React.FC = () => {
             location,
             status: 'open' as const, // Default status, could be enhanced with real status
             lifeguards_on_duty: lifeguardCount,
+            flag_status: flagStatus as 'green' | 'yellow' | 'red' | 'black',
+            flag_reason: flagReason,
             ...weatherInfo
           };
         })

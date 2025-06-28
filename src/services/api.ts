@@ -168,6 +168,16 @@ class ApiService {
     return response.data.data;
   }
 
+  async getPublicLifeguardCounts(): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get('/api/v1/public/lifeguards/counts');
+    return response.data.data ?? [];
+  }
+
+  async getPublicSafetyFlags(): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get('/api/v1/public/safety/flags');
+    return response.data.data ?? [];
+  }
+
   // Lifeguards
   async getLifeguards(): Promise<any[]> {
     const response: AxiosResponse<PaginatedResponse<any>> = await this.api.get('/api/v1/lifeguards');
