@@ -118,7 +118,7 @@ export interface SafetyFlag {
   center_id: string;
   flag_status: 'green' | 'yellow' | 'red' | 'black';
   reason?: string;
-  set_by: string;
+  set_by: string | { first_name: string; last_name: string; email: string };
   set_at: string;
   expires_at?: string;
   created_at: string;

@@ -295,6 +295,50 @@ class ApiService {
     const response: AxiosResponse<ApiResponse<IncidentReport>> = await this.api.put(`/api/v1/reports/${id}`, reportData);
     return response.data.data!;
   }
+
+  // Safety Flags
+  async getCurrentSafetyFlag(centerId: string): Promise<SafetyFlag> {
+    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.get(`/api/v1/safety/centers/${centerId}/current`);
+    return response.data.data!;
+  }
+
+  async getSafetyFlagHistory(centerId: string, page: number = 1, limit: number = 10): Promise<{ flags: any[]; pagination: { currentPage: number; totalPages: number; totalCount: number; hasNext: boolean; hasPrev: boolean } }> {
+    const response = await this.api.get(`/api/v1/safety/centers/${centerId}/history?page=${page}&limit=${limit}`);
+    return response.data;
+  }
+
+  async setSafetyFlag(centerId: string, flagData: {
+    flag_status: 'green' | 'yellow' | 'red' | 'black';
+    reason?: string;
+    expires_at?: string;
+  }): Promise<SafetyFlag> {
+    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.post(`/api/v1/safety/centers/${centerId}/flags`, flagData);
+    return response.data.data!;
+  }
+
+  async updateSafetyFlag(flagId: string, flagData: {
+    flag_status: 'green' | 'yellow' | 'red' | 'black';
+    reason?: string;
+    expires_at?: string;
+  }): Promise<SafetyFlag> {
+    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.put(`/api/v1/safety/flags/${flagId}`, flagData);
+    return response.data.data!;
+  }
+
+  async deleteSafetyFlag(flagId: string): Promise<void> {
+    await this.api.delete(`/api/v1/safety/flags/${flagId}`);
+  }
+
+  async getAllSafetyFlags(page: number = 1, limit: number = 20, center_id?: string, flag_status?: string): Promise<PaginatedResponse<SafetyFlag>> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    if (center_id) params.append('center_id', center_id);
+    if (flag_status) params.append('flag_status', flag_status);
+    
+    const response: AxiosResponse<PaginatedResponse<SafetyFlag>> = await this.api.get(`/api/v1/safety/flags?${params}`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();
