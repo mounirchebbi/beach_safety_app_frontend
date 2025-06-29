@@ -4,6 +4,7 @@ import { Icon, LatLng } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Box, Typography, Paper, Chip, Alert } from '@mui/material';
 import { BeachAccess, Warning, CheckCircle, LocationOn } from '@mui/icons-material';
+import { SafetyZone } from '../../types';
 
 // Fix for default markers in react-leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -67,18 +68,6 @@ interface EmergencyAlert {
   description: string;
   status: 'active' | 'resolved';
   created_at: string;
-}
-
-interface SafetyZone {
-  id: string;
-  center_id: string;
-  location: {
-    lat: number;
-    lng: number;
-  };
-  radius: number;
-  type: 'swimming' | 'surfing' | 'restricted' | 'safe';
-  description: string;
 }
 
 interface BeachMapProps {
@@ -196,12 +185,45 @@ const BeachMap: React.FC<BeachMapProps> = ({
 
   const getSafetyZoneColor = (type: string) => {
     switch (type) {
-      case 'swimming': return '#4caf50';
-      case 'surfing': return '#2196f3';
-      case 'restricted': return '#f44336';
+      case 'no_swim': return '#f44336';
+      case 'caution': return '#ff9800';
       case 'safe': return '#4caf50';
       default: return '#9e9e9e';
     }
+  };
+
+  const getSafetyZoneLabel = (type: string) => {
+    switch (type) {
+      case 'no_swim': return 'No Swim Zone';
+      case 'caution': return 'Caution Zone';
+      case 'safe': return 'Safe Zone';
+      default: return type;
+    }
+  };
+
+  // Helper function to calculate radius from polygon geometry
+  const calculateRadiusFromGeometry = (geometry: GeoJSON.Polygon) => {
+    const coordinates = geometry.coordinates[0];
+    const centerLat = coordinates.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coordinates.length;
+    const centerLng = coordinates.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coordinates.length;
+    
+    // Calculate radius by finding the maximum distance from center to any point in the polygon
+    let maxDistance = 0;
+    coordinates.forEach((coord: number[]) => {
+      const distance = Math.sqrt(
+        Math.pow(coord[0] - centerLng, 2) + Math.pow(coord[1] - centerLat, 2)
+      );
+      if (distance > maxDistance) {
+        maxDistance = distance;
+      }
+    });
+    
+    // Convert from degrees to meters (approximate)
+    const latRad = centerLat * Math.PI / 180;
+    const metersPerDegreeLng = 111320 * Math.cos(latRad);
+    const radiusInMeters = maxDistance * Math.max(111320, metersPerDegreeLng);
+    
+    return Math.round(radiusInMeters);
   };
 
   const getFlagColor = (flagStatus: string) => {
@@ -222,6 +244,17 @@ const BeachMap: React.FC<BeachMapProps> = ({
       case 'black': return 'BEACH CLOSED';
       default: return 'SAFE TO SWIM';
     }
+  };
+
+  // Helper function to convert polygon to circle for display
+  const getZoneCenterAndRadius = (zone: SafetyZone) => {
+    const coordinates = zone.geometry.coordinates[0];
+    const centerLat = coordinates.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coordinates.length;
+    const centerLng = coordinates.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coordinates.length;
+    
+    const radius = calculateRadiusFromGeometry(zone.geometry);
+    
+    return { center: [centerLat, centerLng], radius };
   };
 
   return (
@@ -326,33 +359,41 @@ const BeachMap: React.FC<BeachMapProps> = ({
         ))}
 
         {/* Safety zones */}
-        {showSafetyZones && safetyZones.map((zone) => (
-          <Circle
-            key={zone.id}
-            center={[zone.location.lat, zone.location.lng]}
-            radius={zone.radius}
-            pathOptions={{
-              color: getSafetyZoneColor(zone.type),
-              fillColor: getSafetyZoneColor(zone.type),
-              fillOpacity: 0.2,
-              weight: 2,
-            }}
-          >
-            <Popup>
-              <Box sx={{ minWidth: 200 }}>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  {zone.type.toUpperCase()} Zone
-                </Typography>
-                <Typography variant="body2">
-                  {zone.description}
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  <strong>Radius:</strong> {zone.radius}m
-                </Typography>
-              </Box>
-            </Popup>
-          </Circle>
-        ))}
+        {showSafetyZones && safetyZones.map((zone) => {
+          const { center, radius } = getZoneCenterAndRadius(zone);
+          return (
+            <Circle
+              key={zone.id}
+              center={center as [number, number]}
+              radius={radius}
+              pathOptions={{
+                color: getSafetyZoneColor(zone.zone_type),
+                fillColor: getSafetyZoneColor(zone.zone_type),
+                fillOpacity: 0.2,
+                weight: 2,
+              }}
+            >
+              <Popup>
+                <Box sx={{ minWidth: 200 }}>
+                  <Typography variant="h6" fontWeight="bold" gutterBottom>
+                    {getSafetyZoneLabel(zone.zone_type)}
+                  </Typography>
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Name:</strong> {zone.name}
+                  </Typography>
+                  {zone.description && (
+                    <Typography variant="body2" gutterBottom>
+                      {zone.description}
+                    </Typography>
+                  )}
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    <strong>Radius:</strong> {Math.round(radius)}m
+                  </Typography>
+                </Box>
+              </Popup>
+            </Circle>
+          );
+        })}
 
         {/* Emergency alerts */}
         {showAlerts && alerts.map((alert) => (

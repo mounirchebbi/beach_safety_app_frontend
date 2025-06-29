@@ -358,6 +358,69 @@ class ApiService {
     const response: AxiosResponse<PaginatedResponse<SafetyFlag>> = await this.api.get(`/api/v1/safety/flags?${params}`);
     return response.data;
   }
+
+  // Automatic flag management methods
+  async getFlagManagementMode(centerId: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/api/v1/safety/centers/${centerId}/mode`);
+    return response.data.data;
+  }
+
+  async triggerAutomaticFlagUpdate(centerId: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/api/v1/safety/centers/${centerId}/auto-update`);
+    return response.data.data;
+  }
+
+  async switchToManualMode(centerId: string, flagData: {
+    flag_status: 'green' | 'yellow' | 'red' | 'black';
+    reason?: string;
+    expires_at?: string;
+  }): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/api/v1/safety/centers/${centerId}/manual`, flagData);
+    return response.data.data!;
+  }
+
+  // Safety Zones
+  async getSafetyZonesByCenter(centerId: string): Promise<SafetyZone[]> {
+    const response: AxiosResponse<ApiResponse<SafetyZone[]>> = await this.api.get(`/api/v1/safety-zones/centers/${centerId}`);
+    return response.data.data ?? [];
+  }
+
+  async getSafetyZoneById(zoneId: string): Promise<SafetyZone> {
+    const response: AxiosResponse<ApiResponse<SafetyZone>> = await this.api.get(`/api/v1/safety-zones/${zoneId}`);
+    return response.data.data!;
+  }
+
+  async createSafetyZone(centerId: string, zoneData: {
+    name: string;
+    zone_type: 'no_swim' | 'caution' | 'safe';
+    location: { lat: number; lng: number };
+    radius: number;
+    description?: string;
+  }): Promise<SafetyZone> {
+    const response: AxiosResponse<ApiResponse<SafetyZone>> = await this.api.post(`/api/v1/safety-zones/centers/${centerId}`, zoneData);
+    return response.data.data!;
+  }
+
+  async updateSafetyZone(zoneId: string, zoneData: {
+    name?: string;
+    zone_type?: 'no_swim' | 'caution' | 'safe';
+    location?: { lat: number; lng: number };
+    radius?: number;
+    description?: string;
+  }): Promise<SafetyZone> {
+    const response: AxiosResponse<ApiResponse<SafetyZone>> = await this.api.put(`/api/v1/safety-zones/${zoneId}`, zoneData);
+    return response.data.data!;
+  }
+
+  async deleteSafetyZone(zoneId: string): Promise<void> {
+    await this.api.delete(`/api/v1/safety-zones/${zoneId}`);
+  }
+
+  // Public safety zones
+  async getPublicSafetyZones(): Promise<SafetyZone[]> {
+    const response: AxiosResponse<ApiResponse<SafetyZone[]>> = await this.api.get('/api/v1/safety-zones/public');
+    return response.data.data ?? [];
+  }
 }
 
 export const apiService = new ApiService();

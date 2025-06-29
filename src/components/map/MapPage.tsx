@@ -36,7 +36,7 @@ import {
 import BeachMap from './BeachMap';
 import MapControls from './MapControls';
 import apiService from '../../services/api';
-import { Center, EmergencyAlert } from '../../types';
+import { Center, EmergencyAlert, SafetyZone } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
 // Transform center data to match BeachMap interface
@@ -90,6 +90,7 @@ const MapPage: React.FC = () => {
   const [centers, setCenters] = useState<BeachCenter[]>([]);
   const [alerts, setAlerts] = useState<MapAlert[]>([]);
   const [weatherData, setWeatherData] = useState<any>({});
+  const [safetyZones, setSafetyZones] = useState<SafetyZone[]>([]);
 
   // Fetch centers and their data
   const fetchCentersData = async () => {
@@ -122,6 +123,16 @@ const MapPage: React.FC = () => {
       } catch (error) {
         console.log('Could not fetch safety flags:', error);
       }
+
+      // Fetch safety zones (public endpoint)
+      let zonesData: SafetyZone[] = [];
+      try {
+        zonesData = await apiService.getPublicSafetyZones();
+      } catch (error) {
+        console.log('Could not fetch safety zones:', error);
+      }
+      
+      setSafetyZones(zonesData);
       
       // Transform centers data and fetch additional info
       const transformedCenters = await Promise.all(
@@ -476,7 +487,7 @@ const MapPage: React.FC = () => {
               <BeachMap
                 centers={showCenters ? centers : []}
                 alerts={showAlerts ? alerts : []}
-                safetyZones={[]} // Could be enhanced with real safety zones
+                safetyZones={showSafetyZones ? safetyZones : []}
                 userLocation={userLocation || undefined}
                 onCenterClick={handleCenterClick}
                 onAlertClick={handleAlertClick}

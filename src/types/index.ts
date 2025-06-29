@@ -6,6 +6,7 @@ export interface User {
   first_name: string;
   last_name: string;
   phone?: string;
+  center_id?: string;
   created_at: string;
   is_active: boolean;
   lifeguard_info?: LifeguardInfo;

@@ -136,6 +136,7 @@ const AppContent: React.FC = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/" element={<PublicDashboard />} />
+        <Route path="/dashboard" element={<PublicDashboard />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -147,6 +148,7 @@ const AppContent: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<PublicDashboard />} />
+        <Route path="/dashboard" element={<PublicDashboard />} />
         <Route path="/map" element={<MapPage />} />
 
         {/* Lifeguard Routes */}
@@ -201,13 +203,13 @@ const AppContent: React.FC = () => {
           element={
             <Navigate
               to={
-                user?.role === 'system_admin'
-                  ? '/system'
+                user?.role === 'lifeguard'
+                  ? '/lifeguard'
                   : user?.role === 'center_admin'
                   ? '/admin'
-                  : user?.role === 'lifeguard'
-                  ? '/lifeguard'
-                  : '/'
+                  : user?.role === 'system_admin'
+                  ? '/system'
+                  : '/dashboard' // Default to dashboard for public users
               }
               replace
             />
