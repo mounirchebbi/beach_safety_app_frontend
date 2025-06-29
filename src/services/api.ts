@@ -244,7 +244,12 @@ class ApiService {
   }
 
   async getMyShifts(): Promise<Shift[]> {
-    const response: AxiosResponse<{ success: boolean; count: number; data: Shift[] }> = await this.api.get('/api/v1/shifts/my-shifts');
+    const response: AxiosResponse<PaginatedResponse<Shift>> = await this.api.get('/api/v1/shifts/my-shifts');
+    return response.data.data;
+  }
+
+  async getCurrentShift(lifeguardId: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/api/v1/shifts/current/${lifeguardId}`);
     return response.data.data;
   }
 
@@ -266,9 +271,11 @@ class ApiService {
 
   // Emergency Alerts
   async createSOSAlert(alertData: {
-    center_id: string;
     location: { lat: number; lng: number };
     description?: string;
+    alert_type?: 'sos' | 'medical' | 'drowning' | 'weather';
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    center_id?: string;
   }): Promise<EmergencyAlert> {
     const response: AxiosResponse<ApiResponse<EmergencyAlert>> = await this.api.post('/api/v1/alerts/sos', alertData);
     return response.data.data!;
@@ -292,6 +299,11 @@ class ApiService {
   async assignAlert(id: string, lifeguardId: string): Promise<EmergencyAlert> {
     const response: AxiosResponse<ApiResponse<EmergencyAlert>> = await this.api.post(`/api/v1/alerts/${id}/assign`, { lifeguard_id: lifeguardId });
     return response.data.data!;
+  }
+
+  async getEmergencyStats(centerId: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/api/v1/alerts/public/stats/${centerId}`);
+    return response.data.data;
   }
 
   // Incident Reports
@@ -367,16 +379,61 @@ class ApiService {
 
   async triggerAutomaticFlagUpdate(centerId: string): Promise<any> {
     const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/api/v1/safety/centers/${centerId}/auto-update`);
-    return response.data.data;
+    return response.data;
   }
 
   async switchToManualMode(centerId: string, flagData: {
     flag_status: 'green' | 'yellow' | 'red' | 'black';
     reason?: string;
     expires_at?: string;
-  }): Promise<any> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/api/v1/safety/centers/${centerId}/manual`, flagData);
+  }): Promise<SafetyFlag> {
+    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.post(`/api/v1/safety/centers/${centerId}/manual`, flagData);
     return response.data.data!;
+  }
+
+  // System-wide flag management (System Admin only)
+  async getAllCentersFlagStatus(): Promise<{
+    centers: any[];
+    summary: {
+      total_centers: number;
+      automatic_flags: number;
+      manual_flags: number;
+      expired_flags: number;
+      no_flags: number;
+      needs_attention: number;
+    };
+  }> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get('/api/v1/safety/system/status');
+    return response.data.data;
+  }
+
+  async checkAndUpdateExpiredFlags(): Promise<{
+    updated: number;
+    centers: any[];
+  }> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/safety/system/check-expired');
+    return response.data.data;
+  }
+
+  async initializeAllCenterFlags(): Promise<{
+    initialized: number;
+    centers: any[];
+  }> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/safety/system/initialize-flags');
+    return response.data.data;
+  }
+
+  async forceUpdateAllCenterFlags(): Promise<{
+    updated: any[];
+    failed: any[];
+    summary: {
+      total_centers: number;
+      successful_updates: number;
+      failed_updates: number;
+    };
+  }> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/safety/system/force-update-all');
+    return response.data.data;
   }
 
   // Safety Zones

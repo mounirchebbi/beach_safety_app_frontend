@@ -26,6 +26,7 @@ import { MapContainer, TileLayer, Circle, Marker, Popup, useMapEvents } from 're
 import 'leaflet/dist/leaflet.css';
 import { apiService } from '../../services/api';
 import { Center, WeatherData, SafetyZone } from '../../types';
+import EmergencyAlert from './EmergencyAlert';
 
 // Fix for default markers
 import L from 'leaflet';
@@ -69,6 +70,8 @@ const PublicDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+    // Automatically get user location when component mounts
+    getUserLocation();
   }, []);
 
   const fetchData = async () => {
@@ -580,6 +583,9 @@ const PublicDashboard: React.FC = () => {
           Explore Full Interactive Map
         </Button>
       </Box>
+
+      {/* Emergency Alert Component */}
+      <EmergencyAlert />
     </Box>
   );
 };

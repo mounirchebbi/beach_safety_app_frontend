@@ -87,6 +87,10 @@ const SafetyManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [managementMode, setManagementMode] = useState<'automatic' | 'manual' | null>(null);
+  const [autoUpdateLoading, setAutoUpdateLoading] = useState(false);
+  const [flagExpiration, setFlagExpiration] = useState<string | null>(null);
+  const [flagSetBy, setFlagSetBy] = useState<string | null>(null);
 
   const centerId = user?.center_info?.id;
 
@@ -94,6 +98,7 @@ const SafetyManagement: React.FC = () => {
     if (centerId) {
       loadCurrentFlag();
       loadFlagHistory();
+      loadManagementMode();
     }
   }, [centerId, currentPage]);
 
@@ -126,6 +131,61 @@ const SafetyManagement: React.FC = () => {
       });
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const loadManagementMode = async () => {
+    try {
+      const mode = await apiService.getFlagManagementMode(centerId!);
+      setManagementMode(mode.mode);
+      
+      // Set additional flag information
+      if (mode.current_flag) {
+        setFlagExpiration(mode.current_flag.expires_at);
+        setFlagSetBy(mode.current_flag.set_by?.first_name + ' ' + mode.current_flag.set_by?.last_name || 'Unknown');
+      } else {
+        setFlagExpiration(null);
+        setFlagSetBy(null);
+      }
+    } catch (error) {
+      console.error('Error loading management mode:', error);
+      setManagementMode(null);
+      setFlagExpiration(null);
+      setFlagSetBy(null);
+    }
+  };
+
+  const handleAutoUpdate = async () => {
+    try {
+      setAutoUpdateLoading(true);
+      const result = await apiService.triggerAutomaticFlagUpdate(centerId!);
+      
+      if (result.data.updated) {
+        setSnackbar({
+          open: true,
+          message: `Flag updated automatically: ${result.data.old_flag} → ${result.data.new_flag}`,
+          severity: 'success'
+        });
+        // Reload data
+        await loadCurrentFlag();
+        await loadFlagHistory();
+        await loadManagementMode();
+      } else {
+        setSnackbar({
+          open: true,
+          message: result.message || 'No update needed - current conditions are appropriate',
+          severity: 'info'
+        });
+      }
+    } catch (error) {
+      console.error('Error triggering automatic update:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to trigger automatic update',
+        severity: 'error'
+      });
+    } finally {
+      setAutoUpdateLoading(false);
     }
   };
 
@@ -289,81 +349,172 @@ const SafetyManagement: React.FC = () => {
             <Typography variant="body1" color="text.secondary">
               Manage beach safety conditions and flag status for your center
             </Typography>
+            {managementMode && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Management Mode:
+                </Typography>
+                <Chip
+                  label={managementMode === 'automatic' ? 'Automatic' : 'Manual'}
+                  color={managementMode === 'automatic' ? 'success' : 'warning'}
+                  size="small"
+                  variant="outlined"
+                />
+                {managementMode === 'automatic' && (
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                    (Flags are set automatically based on weather conditions)
+                  </Typography>
+                )}
+              </Box>
+            )}
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-            sx={{ px: 3 }}
-          >
-            Set New Flag
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleAutoUpdate}
+              disabled={autoUpdateLoading}
+              sx={{ px: 3 }}
+            >
+              {autoUpdateLoading ? 'Updating...' : 'Auto Update'}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog()}
+              sx={{ px: 3 }}
+            >
+              Set New Flag
+            </Button>
+          </Box>
         </Box>
 
         {/* Current Flag Status */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" fontWeight="bold">
-                Current Safety Status
+            <Typography variant="h6" gutterBottom>
+              Current Safety Flag Status
+            </Typography>
+            {loading ? (
+              <CircularProgress size={20} />
+            ) : currentFlag ? (
+              <Box>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <Box
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      mr: 2,
+                      backgroundColor: getFlagStatusColor(currentFlag.flag_status)
+                    }}
+                  >
+                    {currentFlag.flag_status.toUpperCase()}
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" color={getFlagStatusColor(currentFlag.flag_status)}>
+                      {currentFlag.flag_status.toUpperCase()} FLAG
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Set on {new Date(currentFlag.set_at).toLocaleString()}
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                {/* Flag Management Details */}
+                <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Flag Management Details
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Management Mode:
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {managementMode === 'automatic' ? '🔄 Automatic' : '👤 Manual'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Set By:
+                      </Typography>
+                      <Typography variant="body1" fontWeight="medium">
+                        {flagSetBy || 'Unknown'}
+                      </Typography>
+                    </Grid>
+                    {flagExpiration && (
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary">
+                          Expires:
+                        </Typography>
+                        <Typography 
+                          variant="body1" 
+                          fontWeight="medium"
+                          color={new Date(flagExpiration) <= new Date() ? 'error.main' : 'text.primary'}
+                        >
+                          {new Date(flagExpiration).toLocaleString()}
+                          {new Date(flagExpiration) <= new Date() && ' (EXPIRED)'}
+                        </Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Box>
+
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  <strong>Reason:</strong> {currentFlag.reason}
+                </Typography>
+              </Box>
+            ) : (
+              <Typography color="text.secondary">
+                No safety flag currently set for this center.
               </Typography>
-              <Button
-                startIcon={<RefreshIcon />}
-                onClick={loadCurrentFlag}
-                disabled={loading}
-              >
-                Refresh
-              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Automatic Flag Management */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Automatic Flag Management
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              The system automatically sets safety flags based on weather conditions. Manual flags override automatic ones until they expire.
+            </Typography>
+            
+            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
+              <Typography variant="subtitle2" color="info.main" gutterBottom>
+                Current Status
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Mode: <strong>{managementMode === 'automatic' ? 'Automatic' : 'Manual Override'}</strong>
+              </Typography>
+              {managementMode === 'manual' && flagExpiration && (
+                <Typography variant="body2" color="text.secondary">
+                  Manual override expires: <strong>{new Date(flagExpiration).toLocaleString()}</strong>
+                </Typography>
+              )}
             </Box>
 
-            {currentFlag ? (
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Chip
-                      icon={getFlagStatusIcon(currentFlag.flag_status)}
-                      label={currentFlag.flag_status.toUpperCase()}
-                      color={getFlagStatusColor(currentFlag.flag_status) as any}
-                      size="medium"
-                      sx={{ fontSize: '1.1rem', fontWeight: 'bold' }}
-                    />
-                    {isFlagExpired(currentFlag) && (
-                      <Chip
-                        label="EXPIRED"
-                        color="error"
-                        size="small"
-                        variant="outlined"
-                      />
-                    )}
-                  </Box>
-                  <Typography variant="body1" sx={{ mt: 1, color: 'text.secondary' }}>
-                    {getFlagStatusDescription(currentFlag.flag_status)}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Set by:</strong> {typeof currentFlag.set_by === 'object' ? `${currentFlag.set_by.first_name} ${currentFlag.set_by.last_name}` : currentFlag.set_by}
-                  </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Set at:</strong> {format(parseISO(currentFlag.set_at), 'MMM dd, yyyy HH:mm')}
-                  </Typography>
-                  {currentFlag.expires_at && (
-                    <Typography variant="body2" gutterBottom>
-                      <strong>Expires at:</strong> {format(parseISO(currentFlag.expires_at), 'MMM dd, yyyy HH:mm')}
-                    </Typography>
-                  )}
-                  {currentFlag.reason && (
-                    <Typography variant="body2">
-                      <strong>Reason:</strong> {currentFlag.reason}
-                    </Typography>
-                  )}
-                </Grid>
-              </Grid>
-            ) : (
-              <Alert severity="info">
-                No safety flag is currently set for this center.
-              </Alert>
-            )}
+            <Button
+              variant="contained"
+              startIcon={<RefreshIcon />}
+              onClick={handleAutoUpdate}
+              disabled={autoUpdateLoading}
+              sx={{ mr: 2 }}
+            >
+              {autoUpdateLoading ? 'Updating...' : 'Trigger Auto Update'}
+            </Button>
+            
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+              This will check current weather conditions and update the flag automatically if needed.
+            </Typography>
           </CardContent>
         </Card>
 
