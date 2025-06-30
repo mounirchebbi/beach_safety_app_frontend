@@ -148,6 +148,49 @@ export interface EmergencyAlert {
   updated_at: string;
 }
 
+// Emergency Escalation Types
+export interface EmergencyEscalation {
+  id: string;
+  alert_id: string;
+  lifeguard_id: string;
+  escalation_type: 'backup_request' | 'medical_support' | 'equipment_request' | 'guidance_request' | 'evacuation_support';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  requested_resources?: any;
+  status: 'pending' | 'acknowledged' | 'responding' | 'resolved' | 'cancelled';
+  acknowledged_by?: string;
+  acknowledged_at?: string;
+  resolved_at?: string;
+  created_at: string;
+  updated_at: string;
+  // Joined data from emergency_alerts
+  alert_type?: string;
+  severity?: string;
+  alert_location?: any;
+  alert_description?: string;
+  // Joined data from users (lifeguard)
+  first_name?: string;
+  last_name?: string;
+  lifeguard_email?: string;
+  // Joined data from users (acknowledged by)
+  acknowledged_by_first_name?: string;
+  acknowledged_by_last_name?: string;
+}
+
+export interface EscalationFormData {
+  alert_id: string;
+  escalation_type: 'backup_request' | 'medical_support' | 'equipment_request' | 'guidance_request' | 'evacuation_support';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  requested_resources?: {
+    personnel?: number;
+    equipment?: string[];
+    medical_supplies?: string[];
+    vehicles?: string[];
+    other?: string;
+  };
+}
+
 // Incident Report Types
 export interface IncidentReport {
   id: string;

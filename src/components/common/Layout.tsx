@@ -39,6 +39,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import NotificationSystem from './NotificationSystem';
 
 const drawerWidth = 280;
 
@@ -80,6 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { text: 'My Shifts', icon: <Schedule />, path: '/lifeguard/shifts' },
           { text: 'Emergency Alerts', icon: <Warning />, path: '/lifeguard/alerts' },
           { text: 'Incident Reports', icon: <Report />, path: '/lifeguard/reports' },
+          { text: 'Emergency Escalations', icon: <Warning />, path: '/lifeguard/escalations' },
         ];
       case 'center_admin':
         return [
@@ -89,6 +91,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { text: 'Shift Scheduling', icon: <Schedule />, path: '/admin/shifts' },
           { text: 'Safety Management', icon: <Security />, path: '/admin/safety' },
           { text: 'Incident Reports', icon: <Report />, path: '/admin/reports' },
+          { text: 'Emergency Escalations', icon: <Warning />, path: '/admin/escalations' },
         ];
       case 'system_admin':
         return [
@@ -307,6 +310,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       >
         {children}
       </Box>
+      
+      {/* Notification System */}
+      <NotificationSystem />
     </Box>
   );
 };

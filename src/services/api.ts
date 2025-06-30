@@ -17,7 +17,9 @@ import {
   CenterFormData,
   ShiftFormData,
   IncidentReportFormData,
-  WeeklyScheduleFormData
+  WeeklyScheduleFormData,
+  EscalationFormData,
+  EmergencyEscalation
 } from '../types';
 
 class ApiService {
@@ -552,6 +554,80 @@ class ApiService {
       };
     }> = await this.api.get(`/api/v1/reports/my-reports?${params}`);
     return response.data;
+  }
+
+  // Emergency Escalations
+  async createEscalation(escalationData: EscalationFormData): Promise<EmergencyEscalation> {
+    const response: AxiosResponse<ApiResponse<EmergencyEscalation>> = await this.api.post('/api/v1/escalations', escalationData);
+    return response.data.data!;
+  }
+
+  async getCenterEscalations(page: number = 1, limit: number = 10, filters?: any): Promise<{
+    data: EmergencyEscalation[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...filters
+    });
+    const response: AxiosResponse<{
+      success: boolean;
+      data: EmergencyEscalation[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }> = await this.api.get(`/api/v1/escalations/center?${params}`);
+    return response.data;
+  }
+
+  async getMyEscalations(page: number = 1, limit: number = 10): Promise<{
+    data: EmergencyEscalation[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    const response: AxiosResponse<{
+      success: boolean;
+      data: EmergencyEscalation[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }> = await this.api.get(`/api/v1/escalations/my-escalations?${params}`);
+    return response.data;
+  }
+
+  async getEscalationById(id: string): Promise<EmergencyEscalation> {
+    const response: AxiosResponse<ApiResponse<EmergencyEscalation>> = await this.api.get(`/api/v1/escalations/${id}`);
+    return response.data.data!;
+  }
+
+  async acknowledgeEscalation(id: string): Promise<EmergencyEscalation> {
+    const response: AxiosResponse<ApiResponse<EmergencyEscalation>> = await this.api.put(`/api/v1/escalations/${id}/acknowledge`);
+    return response.data.data!;
+  }
+
+  async resolveEscalation(id: string): Promise<EmergencyEscalation> {
+    const response: AxiosResponse<ApiResponse<EmergencyEscalation>> = await this.api.put(`/api/v1/escalations/${id}/resolve`);
+    return response.data.data!;
   }
 }
 

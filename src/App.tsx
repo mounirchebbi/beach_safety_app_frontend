@@ -24,6 +24,7 @@ import LifeguardDashboard from './components/lifeguard/LifeguardDashboard';
 import ShiftManagement from './components/lifeguard/ShiftManagement';
 import EmergencyAlerts from './components/lifeguard/EmergencyAlerts';
 import IncidentReports from './components/lifeguard/IncidentReports';
+import EmergencyEscalations from './components/lifeguard/EmergencyEscalations';
 
 // Center Admin Pages
 import CenterDashboard from './components/admin/CenterDashboard';
@@ -32,6 +33,7 @@ import LifeguardManagement from './components/admin/LifeguardManagement';
 import ShiftScheduling from './components/admin/ShiftScheduling';
 import SafetyManagement from './components/admin/SafetyManagement';
 import AdminIncidentReports from './components/admin/IncidentReports';
+import EscalationManagement from './components/admin/EscalationManagement';
 
 // System Admin Pages
 import SystemDashboard from './components/system-admin/SystemDashboard';
@@ -162,6 +164,7 @@ const AppContent: React.FC = () => {
                 <Route path="/shifts" element={<ShiftManagement />} />
                 <Route path="/alerts" element={<EmergencyAlerts />} />
                 <Route path="/reports" element={<IncidentReports />} />
+                <Route path="/escalations" element={<EmergencyEscalations />} />
               </Routes>
             </ProtectedRoute>
           }
@@ -179,6 +182,7 @@ const AppContent: React.FC = () => {
                 <Route path="/shifts" element={<ShiftScheduling />} />
                 <Route path="/safety" element={<SafetyManagement />} />
                 <Route path="/reports" element={<AdminIncidentReports />} />
+                <Route path="/escalations" element={<EscalationManagement />} />
               </Routes>
             </ProtectedRoute>
           }
