@@ -30,7 +30,12 @@ import {
   CircularProgress,
   Avatar,
   Divider,
-  TablePagination
+  TablePagination,
+  Checkbox,
+  FormControlLabel,
+  FormGroup,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -42,7 +47,8 @@ import {
   AccessTime as TimeIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  CalendarViewWeek as WeeklyIcon
 } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -50,7 +56,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format, parseISO, isAfter, isBefore, addHours } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
-import { ShiftFormData } from '../../types';
+import { ShiftFormData, WeeklyScheduleFormData } from '../../types';
 
 // Interface matching the actual API response structure
 interface ShiftWithLifeguard {
@@ -98,6 +104,31 @@ const ShiftScheduling: React.FC = () => {
     end_time: ''
   });
   
+  // Weekly schedule form state
+  const [weeklyFormData, setWeeklyFormData] = useState<WeeklyScheduleFormData>({
+    lifeguard_id: '',
+    center_id: '',
+    start_time: '',
+    end_time: '',
+    days_of_week: [],
+    start_date: '',
+    weeks_count: 4
+  });
+
+  // Tab state for create dialog
+  const [createTabValue, setCreateTabValue] = useState(0);
+
+  // Day selection constants
+  const daysOfWeek = [
+    { value: 0, label: 'Sunday' },
+    { value: 1, label: 'Monday' },
+    { value: 2, label: 'Tuesday' },
+    { value: 3, label: 'Wednesday' },
+    { value: 4, label: 'Thursday' },
+    { value: 5, label: 'Friday' },
+    { value: 6, label: 'Saturday' }
+  ];
+
   // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -132,6 +163,24 @@ const ShiftScheduling: React.FC = () => {
     }));
   };
 
+  // Handle weekly form input changes
+  const handleWeeklyFormChange = (field: keyof WeeklyScheduleFormData, value: any) => {
+    setWeeklyFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Handle day selection
+  const handleDayToggle = (dayValue: number) => {
+    setWeeklyFormData(prev => ({
+      ...prev,
+      days_of_week: prev.days_of_week.includes(dayValue)
+        ? prev.days_of_week.filter(day => day !== dayValue)
+        : [...prev.days_of_week, dayValue].sort()
+    }));
+  };
+
   // Reset form
   const resetForm = () => {
     setFormData({
@@ -140,6 +189,16 @@ const ShiftScheduling: React.FC = () => {
       start_time: '',
       end_time: ''
     });
+    setWeeklyFormData({
+      lifeguard_id: '',
+      center_id: '',
+      start_time: '',
+      end_time: '',
+      days_of_week: [],
+      start_date: '',
+      weeks_count: 4
+    });
+    setCreateTabValue(0);
   };
 
   // Open create dialog
@@ -192,6 +251,36 @@ const ShiftScheduling: React.FC = () => {
       loadData();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create shift');
+    }
+  };
+
+  // Create weekly schedule
+  const handleWeeklySubmit = async () => {
+    try {
+      if (!weeklyFormData.lifeguard_id || !weeklyFormData.start_time || !weeklyFormData.end_time || !weeklyFormData.start_date) {
+        setError('Lifeguard, start time, end time, and start date are required');
+        return;
+      }
+
+      if (weeklyFormData.days_of_week.length === 0) {
+        setError('Please select at least one day of the week');
+        return;
+      }
+
+      // Validate that end time is after start time
+      const startTime = new Date(`2000-01-01T${weeklyFormData.start_time}`);
+      const endTime = new Date(`2000-01-01T${weeklyFormData.end_time}`);
+      if (endTime <= startTime) {
+        setError('End time must be after start time');
+        return;
+      }
+
+      const result = await apiService.createWeeklySchedule(weeklyFormData);
+      setSuccess(`Weekly schedule created successfully. ${result.data.total_created} shifts created, ${result.data.total_skipped} skipped due to conflicts.`);
+      setCreateDialogOpen(false);
+      loadData();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to create weekly schedule');
     }
   };
 
@@ -441,45 +530,140 @@ const ShiftScheduling: React.FC = () => {
         <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
           <DialogTitle>Schedule New Shift</DialogTitle>
           <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <FormControl fullWidth required>
-                  <InputLabel>Lifeguard</InputLabel>
-                  <Select
-                    value={formData.lifeguard_id}
-                    onChange={(e) => handleFormChange('lifeguard_id', e.target.value)}
-                    label="Lifeguard"
-                  >
-                    {lifeguards.map((lifeguard) => (
-                      <MenuItem key={lifeguard.id} value={lifeguard.id}>
-                        {lifeguard.first_name} {lifeguard.last_name} - {lifeguard.email}
-                      </MenuItem>
+            <Tabs value={createTabValue} onChange={(_, newValue) => setCreateTabValue(newValue)} sx={{ mb: 2 }}>
+              <Tab label="Single Shift" icon={<ScheduleIcon />} />
+              <Tab label="Weekly Schedule" icon={<WeeklyIcon />} />
+            </Tabs>
+
+            {createTabValue === 0 && (
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Lifeguard</InputLabel>
+                    <Select
+                      value={formData.lifeguard_id}
+                      onChange={(e) => handleFormChange('lifeguard_id', e.target.value)}
+                      label="Lifeguard"
+                    >
+                      {lifeguards.map((lifeguard) => (
+                        <MenuItem key={lifeguard.id} value={lifeguard.id}>
+                          {lifeguard.first_name} {lifeguard.last_name} - {lifeguard.email}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <DateTimePicker
+                    label="Start Time"
+                    value={formData.start_time ? parseISO(formData.start_time) : null}
+                    onChange={(date) => handleFormChange('start_time', date ? date.toISOString() : '')}
+                    slotProps={{ textField: { fullWidth: true, required: true } }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <DateTimePicker
+                    label="End Time"
+                    value={formData.end_time ? parseISO(formData.end_time) : null}
+                    onChange={(date) => handleFormChange('end_time', date ? date.toISOString() : '')}
+                    slotProps={{ textField: { fullWidth: true, required: true } }}
+                  />
+                </Grid>
+              </Grid>
+            )}
+
+            {createTabValue === 1 && (
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Lifeguard</InputLabel>
+                    <Select
+                      value={weeklyFormData.lifeguard_id}
+                      onChange={(e) => handleWeeklyFormChange('lifeguard_id', e.target.value)}
+                      label="Lifeguard"
+                    >
+                      {lifeguards.map((lifeguard) => (
+                        <MenuItem key={lifeguard.id} value={lifeguard.id}>
+                          {lifeguard.first_name} {lifeguard.last_name} - {lifeguard.email}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Start Time"
+                    type="time"
+                    value={weeklyFormData.start_time}
+                    onChange={(e) => handleWeeklyFormChange('start_time', e.target.value)}
+                    fullWidth
+                    required
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="End Time"
+                    type="time"
+                    value={weeklyFormData.end_time}
+                    onChange={(e) => handleWeeklyFormChange('end_time', e.target.value)}
+                    fullWidth
+                    required
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Start Date"
+                    type="date"
+                    value={weeklyFormData.start_date}
+                    onChange={(e) => handleWeeklyFormChange('start_date', e.target.value)}
+                    fullWidth
+                    required
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Number of Weeks"
+                    type="number"
+                    value={weeklyFormData.weeks_count}
+                    onChange={(e) => handleWeeklyFormChange('weeks_count', parseInt(e.target.value))}
+                    fullWidth
+                    required
+                    inputProps={{ min: 1, max: 12 }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Days of the Week
+                  </Typography>
+                  <FormGroup row>
+                    {daysOfWeek.map((day) => (
+                      <FormControlLabel
+                        key={day.value}
+                        control={
+                          <Checkbox
+                            checked={weeklyFormData.days_of_week.includes(day.value)}
+                            onChange={() => handleDayToggle(day.value)}
+                          />
+                        }
+                        label={day.label}
+                      />
                     ))}
-                  </Select>
-                </FormControl>
+                  </FormGroup>
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <DateTimePicker
-                  label="Start Time"
-                  value={formData.start_time ? parseISO(formData.start_time) : null}
-                  onChange={(date) => handleFormChange('start_time', date ? date.toISOString() : '')}
-                  slotProps={{ textField: { fullWidth: true, required: true } }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <DateTimePicker
-                  label="End Time"
-                  value={formData.end_time ? parseISO(formData.end_time) : null}
-                  onChange={(date) => handleFormChange('end_time', date ? date.toISOString() : '')}
-                  slotProps={{ textField: { fullWidth: true, required: true } }}
-                />
-              </Grid>
-            </Grid>
+            )}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateSubmit} variant="contained">
-              Schedule Shift
+            <Button 
+              onClick={createTabValue === 0 ? handleCreateSubmit : handleWeeklySubmit} 
+              variant="contained"
+            >
+              {createTabValue === 0 ? 'Schedule Shift' : 'Create Weekly Schedule'}
             </Button>
           </DialogActions>
         </Dialog>

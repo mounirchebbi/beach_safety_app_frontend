@@ -4,7 +4,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Button,
   Table,
   TableBody,
   TableCell,
@@ -18,83 +17,59 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Grid,
   Alert,
   Snackbar,
   Tooltip,
   CircularProgress,
-  Avatar,
-  Divider,
   TablePagination,
-  FormControlLabel,
-  Switch,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Avatar,
+  Divider,
+  Button
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
   Visibility as ViewIcon,
   Report as ReportIcon,
   ExpandMore as ExpandMoreIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  FilterList as FilterIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
-import { IncidentReport, IncidentReportFormData } from '../../types';
+import { IncidentReport } from '../../types';
 
 const IncidentReports: React.FC = () => {
   const { user } = useAuth();
   const [reports, setReports] = useState<IncidentReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<IncidentReport | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Form state
-  const [formData, setFormData] = useState<IncidentReportFormData>({
-    alert_id: '',
-    incident_type: '',
-    description: '',
-    action_taken: '',
-    outcome: '',
-    involved_persons: {}
+  const [filters, setFilters] = useState({
+    status: '',
+    lifeguard_id: ''
   });
-
-  // Incident types
-  const incidentTypes = [
-    'Medical Emergency',
-    'Drowning Rescue',
-    'First Aid',
-    'Weather Emergency',
-    'Lost Child',
-    'Equipment Failure',
-    'Beach Safety Violation',
-    'Other'
-  ];
 
   // Load reports
   const loadReports = async () => {
     try {
       setLoading(true);
-      const result = await apiService.getMyIncidentReports(page + 1, rowsPerPage);
+      const result = await apiService.getIncidentReports(page + 1, rowsPerPage, filters);
       setReports(result.data);
       setTotalCount(result.pagination.total);
     } catch (err: any) {
@@ -106,86 +81,12 @@ const IncidentReports: React.FC = () => {
 
   useEffect(() => {
     loadReports();
-  }, [page, rowsPerPage]);
-
-  // Handle form input changes
-  const handleFormChange = (field: keyof IncidentReportFormData, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      alert_id: '',
-      incident_type: '',
-      description: '',
-      action_taken: '',
-      outcome: '',
-      involved_persons: {}
-    });
-  };
-
-  // Create report
-  const handleCreateSubmit = async () => {
-    try {
-      if (!formData.incident_type || !formData.description) {
-        setError('Incident type and description are required');
-        return;
-      }
-
-      setSubmitting(true);
-      await apiService.createIncidentReport(formData);
-      setSuccess('Incident report created successfully');
-      setCreateDialogOpen(false);
-      resetForm();
-      loadReports();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create incident report');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Update report
-  const handleUpdateSubmit = async () => {
-    if (!selectedReport) return;
-
-    try {
-      setSubmitting(true);
-      await apiService.updateIncidentReport(selectedReport.id, formData);
-      setSuccess('Incident report updated successfully');
-      setEditDialogOpen(false);
-      setSelectedReport(null);
-      resetForm();
-      loadReports();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update incident report');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  }, [page, rowsPerPage, filters]);
 
   // View report
   const handleViewReport = (report: IncidentReport) => {
     setSelectedReport(report);
     setViewDialogOpen(true);
-  };
-
-  // Edit report
-  const handleEditReport = (report: IncidentReport) => {
-    setSelectedReport(report);
-    setFormData({
-      alert_id: report.alert_id || '',
-      incident_type: report.incident_type,
-      description: report.description,
-      action_taken: report.action_taken || '',
-      outcome: report.outcome || '',
-      involved_persons: report.involved_persons || {}
-    });
-    setEditDialogOpen(true);
   };
 
   // Get severity color
@@ -207,20 +108,53 @@ const IncidentReports: React.FC = () => {
     return <ReportIcon />;
   };
 
+  // Handle filter changes
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setPage(0); // Reset to first page when filtering
+  };
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">
-          Incident Reports
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setCreateDialogOpen(true)}
-        >
-          Create Report
-        </Button>
-      </Box>
+      <Typography variant="h4" sx={{ mb: 3 }}>
+        Incident Reports
+      </Typography>
+
+      {/* Filters */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Alert Status</InputLabel>
+                <Select
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  label="Alert Status"
+                >
+                  <MenuItem value="">All Statuses</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="responding">Responding</MenuItem>
+                  <MenuItem value="resolved">Resolved</MenuItem>
+                  <MenuItem value="closed">Closed</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                label="Lifeguard ID"
+                value={filters.lifeguard_id}
+                onChange={(e) => handleFilterChange('lifeguard_id', e.target.value)}
+                fullWidth
+                placeholder="Filter by lifeguard ID"
+              />
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       {/* Reports Table */}
       <Card>
@@ -236,7 +170,7 @@ const IncidentReports: React.FC = () => {
                 No Incident Reports
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                You haven't created any incident reports yet.
+                No incident reports found for your center.
               </Typography>
             </Box>
           ) : (
@@ -245,6 +179,7 @@ const IncidentReports: React.FC = () => {
                 <Table>
                   <TableHead>
                     <TableRow>
+                      <TableCell>Lifeguard</TableCell>
                       <TableCell>Type</TableCell>
                       <TableCell>Description</TableCell>
                       <TableCell>Alert Type</TableCell>
@@ -256,6 +191,21 @@ const IncidentReports: React.FC = () => {
                   <TableBody>
                     {reports.map((report) => (
                       <TableRow key={report.id} hover>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar sx={{ width: 32, height: 32 }}>
+                              {report.first_name?.[0]}{report.last_name?.[0]}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight="medium">
+                                {report.first_name} {report.last_name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {report.lifeguard_email}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             {getIncidentTypeIcon(report.incident_type)}
@@ -299,24 +249,14 @@ const IncidentReports: React.FC = () => {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Tooltip title="View Details">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleViewReport(report)}
-                              >
-                                <ViewIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Edit Report">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleEditReport(report)}
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
+                          <Tooltip title="View Details">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewReport(report)}
+                            >
+                              <ViewIcon />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -340,84 +280,6 @@ const IncidentReports: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Create Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Create Incident Report</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                label="Alert ID (Optional)"
-                value={formData.alert_id}
-                onChange={(e) => handleFormChange('alert_id', e.target.value)}
-                fullWidth
-                helperText="Link this report to a specific emergency alert"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel>Incident Type</InputLabel>
-                <Select
-                  value={formData.incident_type}
-                  onChange={(e) => handleFormChange('incident_type', e.target.value)}
-                  label="Incident Type"
-                >
-                  {incidentTypes.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Description"
-                value={formData.description}
-                onChange={(e) => handleFormChange('description', e.target.value)}
-                fullWidth
-                multiline
-                rows={4}
-                required
-                helperText="Provide a detailed description of the incident"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Action Taken"
-                value={formData.action_taken}
-                onChange={(e) => handleFormChange('action_taken', e.target.value)}
-                fullWidth
-                multiline
-                rows={3}
-                helperText="Describe the actions you took to address the incident"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Outcome"
-                value={formData.outcome}
-                onChange={(e) => handleFormChange('outcome', e.target.value)}
-                fullWidth
-                multiline
-                rows={2}
-                helperText="What was the final outcome of the incident?"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handleCreateSubmit}
-            variant="contained"
-            disabled={submitting || !formData.incident_type || !formData.description}
-          >
-            {submitting ? <CircularProgress size={20} /> : 'Create Report'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* View Dialog */}
       <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Incident Report Details</DialogTitle>
@@ -425,12 +287,32 @@ const IncidentReports: React.FC = () => {
           {selectedReport && (
             <Box sx={{ mt: 1 }}>
               <Grid container spacing={2}>
+                {/* Lifeguard Info */}
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Avatar sx={{ width: 48, height: 48 }}>
+                      {selectedReport.first_name?.[0]}{selectedReport.last_name?.[0]}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h6">
+                        {selectedReport.first_name} {selectedReport.last_name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedReport.lifeguard_email}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Divider sx={{ mb: 2 }} />
+                </Grid>
+
+                {/* Incident Type */}
                 <Grid item xs={12}>
                   <Typography variant="h6" gutterBottom>
                     {selectedReport.incident_type}
                   </Typography>
                 </Grid>
                 
+                {/* Linked Alert */}
                 {selectedReport.alert_type && (
                   <Grid item xs={12}>
                     <Accordion>
@@ -463,12 +345,23 @@ const IncidentReports: React.FC = () => {
                               {selectedReport.alert_description || 'No description available'}
                             </Typography>
                           </Grid>
+                          <Grid item xs={12}>
+                            <Typography variant="body2" color="text.secondary">
+                              Alert Status
+                            </Typography>
+                            <Chip
+                              label={selectedReport.alert_status || 'Unknown'}
+                              color={selectedReport.alert_status === 'resolved' ? 'success' : 'warning'}
+                              size="small"
+                            />
+                          </Grid>
                         </Grid>
                       </AccordionDetails>
                     </Accordion>
                   </Grid>
                 )}
 
+                {/* Description */}
                 <Grid item xs={12}>
                   <Typography variant="body2" color="text.secondary">
                     Description
@@ -478,6 +371,7 @@ const IncidentReports: React.FC = () => {
                   </Typography>
                 </Grid>
 
+                {/* Action Taken */}
                 {selectedReport.action_taken && (
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary">
@@ -489,6 +383,7 @@ const IncidentReports: React.FC = () => {
                   </Grid>
                 )}
 
+                {/* Outcome */}
                 {selectedReport.outcome && (
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary">
@@ -500,6 +395,7 @@ const IncidentReports: React.FC = () => {
                   </Grid>
                 )}
 
+                {/* Timestamps */}
                 <Grid item xs={6}>
                   <Typography variant="body2" color="text.secondary">
                     Created
@@ -526,94 +422,10 @@ const IncidentReports: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Edit Incident Report</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                label="Alert ID (Optional)"
-                value={formData.alert_id}
-                onChange={(e) => handleFormChange('alert_id', e.target.value)}
-                fullWidth
-                helperText="Link this report to a specific emergency alert"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel>Incident Type</InputLabel>
-                <Select
-                  value={formData.incident_type}
-                  onChange={(e) => handleFormChange('incident_type', e.target.value)}
-                  label="Incident Type"
-                >
-                  {incidentTypes.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Description"
-                value={formData.description}
-                onChange={(e) => handleFormChange('description', e.target.value)}
-                fullWidth
-                multiline
-                rows={4}
-                required
-                helperText="Provide a detailed description of the incident"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Action Taken"
-                value={formData.action_taken}
-                onChange={(e) => handleFormChange('action_taken', e.target.value)}
-                fullWidth
-                multiline
-                rows={3}
-                helperText="Describe the actions you took to address the incident"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Outcome"
-                value={formData.outcome}
-                onChange={(e) => handleFormChange('outcome', e.target.value)}
-                fullWidth
-                multiline
-                rows={2}
-                helperText="What was the final outcome of the incident?"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handleUpdateSubmit}
-            variant="contained"
-            disabled={submitting || !formData.incident_type || !formData.description}
-          >
-            {submitting ? <CircularProgress size={20} /> : 'Update Report'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbars */}
+      {/* Error Snackbar */}
       <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError('')}>
         <Alert onClose={() => setError('')} severity="error">
           {error}
-        </Alert>
-      </Snackbar>
-
-      <Snackbar open={!!success} autoHideDuration={6000} onClose={() => setSuccess('')}>
-        <Alert onClose={() => setSuccess('')} severity="success">
-          {success}
         </Alert>
       </Snackbar>
     </Box>

@@ -16,7 +16,8 @@ import {
   WeatherData,
   CenterFormData,
   ShiftFormData,
-  IncidentReportFormData
+  IncidentReportFormData,
+  WeeklyScheduleFormData
 } from '../types';
 
 class ApiService {
@@ -222,6 +223,11 @@ class ApiService {
   async createShift(shiftData: ShiftFormData): Promise<any> {
     const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/shifts', shiftData);
     return response.data.data!;
+  }
+
+  async createWeeklySchedule(weeklyData: WeeklyScheduleFormData): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/shifts/weekly', weeklyData);
+    return response.data;
   }
 
   async updateShift(id: string, shiftData: Partial<ShiftFormData>): Promise<any> {
@@ -477,6 +483,75 @@ class ApiService {
   async getPublicSafetyZones(): Promise<SafetyZone[]> {
     const response: AxiosResponse<ApiResponse<SafetyZone[]>> = await this.api.get('/api/v1/safety-zones/public');
     return response.data.data ?? [];
+  }
+
+  // Incident Reports
+  async createIncidentReport(reportData: IncidentReportFormData): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/reports', reportData);
+    return response.data;
+  }
+
+  async getIncidentReports(page: number = 1, limit: number = 10, filters?: any): Promise<{
+    data: IncidentReport[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...filters
+    });
+    const response: AxiosResponse<{
+      success: boolean;
+      data: IncidentReport[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }> = await this.api.get(`/api/v1/reports?${params}`);
+    return response.data;
+  }
+
+  async getIncidentReportById(id: string): Promise<IncidentReport> {
+    const response: AxiosResponse<ApiResponse<IncidentReport>> = await this.api.get(`/api/v1/reports/${id}`);
+    return response.data.data!;
+  }
+
+  async updateIncidentReport(id: string, reportData: Partial<IncidentReportFormData>): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/reports/${id}`, reportData);
+    return response.data;
+  }
+
+  async getMyIncidentReports(page: number = 1, limit: number = 10): Promise<{
+    data: IncidentReport[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    const response: AxiosResponse<{
+      success: boolean;
+      data: IncidentReport[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }> = await this.api.get(`/api/v1/reports/my-reports?${params}`);
+    return response.data;
   }
 }
 

@@ -160,6 +160,16 @@ export interface IncidentReport {
   involved_persons?: any;
   created_at: string;
   updated_at: string;
+  // Joined data from emergency_alerts
+  alert_type?: string;
+  severity?: string;
+  alert_status?: string;
+  alert_location?: any;
+  alert_description?: string;
+  // Joined data from users
+  first_name?: string;
+  last_name?: string;
+  lifeguard_email?: string;
 }
 
 // API Response Types
@@ -238,6 +248,16 @@ export interface ShiftFormData {
   center_id: string;
   start_time: string;
   end_time: string;
+}
+
+export interface WeeklyScheduleFormData {
+  lifeguard_id: string;
+  center_id: string;
+  start_time: string; // Time only (HH:mm format)
+  end_time: string; // Time only (HH:mm format)
+  days_of_week: number[]; // Array of day numbers (0-6, where 0 is Sunday)
+  start_date: string; // Start date for the weekly schedule
+  weeks_count: number; // Number of weeks to create shifts for
 }
 
 export interface CenterFormData {
