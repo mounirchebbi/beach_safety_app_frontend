@@ -17,14 +17,16 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  People,
+  AdminPanelSettings
 } from '@mui/icons-material';
 import { useSocket } from '../../hooks/useSocket';
 import { useAuth } from '../../context/AuthContext';
 
 interface Notification {
   id: string;
-  type: 'new_escalation' | 'escalation_status_updated';
+  type: 'new_escalation' | 'escalation_status_updated' | 'new_inter_center_support' | 'inter_center_support_status_updated';
   title: string;
   message: string;
   severity: 'info' | 'warning' | 'error' | 'success';
@@ -85,12 +87,52 @@ const NotificationSystem: React.FC = () => {
       setOpen(true);
     };
 
+    // Listen for new inter-center support notifications
+    const handleNewInterCenterSupport = (data: any) => {
+      const notification: Notification = {
+        id: `support_${data.supportRequestId}_${Date.now()}`,
+        type: 'new_inter_center_support',
+        title: 'New Inter-Center Support Request',
+        message: `${data.requestingCenterName} is requesting ${data.requestType.replace('_', ' ')} support`,
+        severity: getPrioritySeverity(data.priority),
+        data,
+        timestamp: data.timestamp,
+        read: false
+      };
+
+      setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+      setCurrentNotification(notification);
+      setOpen(true);
+    };
+
+    // Listen for inter-center support status updates
+    const handleInterCenterSupportStatusUpdate = (data: any) => {
+      const notification: Notification = {
+        id: `support_status_${data.supportRequestId}_${Date.now()}`,
+        type: 'inter_center_support_status_updated',
+        title: 'Support Request Status Updated',
+        message: `Support request ${data.requestType.replace('_', ' ')} has been ${data.status}`,
+        severity: getStatusSeverity(data.status),
+        data,
+        timestamp: data.timestamp,
+        read: false
+      };
+
+      setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+      setCurrentNotification(notification);
+      setOpen(true);
+    };
+
     socket.on('new_escalation', handleNewEscalation);
     socket.on('escalation_status_updated', handleEscalationStatusUpdate);
+    socket.on('new_inter_center_support', handleNewInterCenterSupport);
+    socket.on('inter_center_support_status_updated', handleInterCenterSupportStatusUpdate);
 
     return () => {
       socket.off('new_escalation', handleNewEscalation);
       socket.off('escalation_status_updated', handleEscalationStatusUpdate);
+      socket.off('new_inter_center_support', handleNewInterCenterSupport);
+      socket.off('inter_center_support_status_updated', handleInterCenterSupportStatusUpdate);
     };
   }, [socket, user]);
 
@@ -129,6 +171,21 @@ const NotificationSystem: React.FC = () => {
     return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
+  const getSupportRequestTypeIcon = (type: string) => {
+    switch (type) {
+      case 'personnel_support': return <People />;
+      case 'equipment_support': return <InfoIcon />;
+      case 'medical_support': return <InfoIcon />;
+      case 'evacuation_support': return <ErrorIcon />;
+      case 'coordination_support': return <AdminPanelSettings />;
+      default: return <InfoIcon />;
+    }
+  };
+
+  const getSupportRequestTypeLabel = (type: string) => {
+    return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+
   const handleClose = () => {
     setOpen(false);
     setCurrentNotification(null);
@@ -155,6 +212,77 @@ const NotificationSystem: React.FC = () => {
   if (!user || user.role !== 'center_admin') {
     return null;
   }
+
+  const renderNotificationDetails = (notification: Notification) => {
+    if (notification.type === 'new_escalation' || notification.type === 'escalation_status_updated') {
+      return (
+        <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Typography variant="body2" gutterBottom>
+            <strong>Lifeguard:</strong> {notification.data.lifeguardName}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>Type:</strong> {getEscalationTypeLabel(notification.data.escalationType)}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>Priority:</strong> 
+            <Chip 
+              label={notification.data.priority} 
+              size="small" 
+              color={getPrioritySeverity(notification.data.priority) as any}
+              sx={{ ml: 1 }}
+            />
+          </Typography>
+          {notification.data.description && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              <strong>Description:</strong> {notification.data.description}
+            </Typography>
+          )}
+          {notification.data.alertType && (
+            <Typography variant="body2">
+              <strong>Linked Alert:</strong> {notification.data.alertType} ({notification.data.alertSeverity})
+            </Typography>
+          )}
+        </Box>
+      );
+    }
+
+    if (notification.type === 'new_inter_center_support' || notification.type === 'inter_center_support_status_updated') {
+      return (
+        <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Typography variant="body2" gutterBottom>
+            <strong>Requesting Center:</strong> {notification.data.requestingCenterName}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>Requesting Admin:</strong> {notification.data.requestingAdminName}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>Type:</strong> {getSupportRequestTypeLabel(notification.data.requestType)}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>Priority:</strong> 
+            <Chip 
+              label={notification.data.priority} 
+              size="small" 
+              color={getPrioritySeverity(notification.data.priority) as any}
+              sx={{ ml: 1 }}
+            />
+          </Typography>
+          {notification.data.title && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              <strong>Title:</strong> {notification.data.title}
+            </Typography>
+          )}
+          {notification.data.description && (
+            <Typography variant="body2">
+              <strong>Description:</strong> {notification.data.description}
+            </Typography>
+          )}
+        </Box>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <>
@@ -184,35 +312,7 @@ const NotificationSystem: React.FC = () => {
           {currentNotification?.message}
           
           <Collapse in={expanded} timeout="auto" unmountOnExit>
-            {currentNotification?.data && (
-              <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Lifeguard:</strong> {currentNotification.data.lifeguardName}
-                </Typography>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Type:</strong> {getEscalationTypeLabel(currentNotification.data.escalationType)}
-                </Typography>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Priority:</strong> 
-                  <Chip 
-                    label={currentNotification.data.priority} 
-                    size="small" 
-                    color={getPrioritySeverity(currentNotification.data.priority) as any}
-                    sx={{ ml: 1 }}
-                  />
-                </Typography>
-                {currentNotification.data.description && (
-                  <Typography variant="body2" sx={{ mt: 1 }}>
-                    <strong>Description:</strong> {currentNotification.data.description}
-                  </Typography>
-                )}
-                {currentNotification.data.alertType && (
-                  <Typography variant="body2">
-                    <strong>Linked Alert:</strong> {currentNotification.data.alertType} ({currentNotification.data.alertSeverity})
-                  </Typography>
-                )}
-              </Box>
-            )}
+            {currentNotification && renderNotificationDetails(currentNotification)}
           </Collapse>
         </Alert>
       </Snackbar>

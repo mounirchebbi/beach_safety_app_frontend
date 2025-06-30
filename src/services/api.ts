@@ -629,6 +629,90 @@ class ApiService {
     const response: AxiosResponse<ApiResponse<EmergencyEscalation>> = await this.api.put(`/api/v1/escalations/${id}/resolve`);
     return response.data.data!;
   }
+
+  // Inter-Center Support
+  async createInterCenterSupportRequest(requestData: {
+    target_center_id: string;
+    escalation_id?: string;
+    request_type: 'personnel_support' | 'equipment_support' | 'medical_support' | 'coordination_support';
+    priority: 'low' | 'medium' | 'high';
+    title: string;
+    description: string;
+    requested_resources?: any;
+  }): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/inter-center-support', requestData);
+    return response.data.data!;
+  }
+
+  async getIncomingSupportRequests(page: number = 1, limit: number = 10): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    const response: AxiosResponse<{
+      success: boolean;
+      data: any[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }> = await this.api.get(`/api/v1/inter-center-support/incoming?page=${page}&limit=${limit}`);
+    return response.data;
+  }
+
+  async getOutgoingSupportRequests(page: number = 1, limit: number = 10): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    const response: AxiosResponse<{
+      success: boolean;
+      data: any[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }> = await this.api.get(`/api/v1/inter-center-support/outgoing?page=${page}&limit=${limit}`);
+    return response.data;
+  }
+
+  async getSupportRequestById(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/api/v1/inter-center-support/${id}`);
+    return response.data.data!;
+  }
+
+  async acknowledgeSupportRequest(id: string, acknowledgmentNote?: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/inter-center-support/${id}/acknowledge`, {
+      acknowledgment_note: acknowledgmentNote
+    });
+    return response.data.data!;
+  }
+
+  async resolveSupportRequest(id: string, resolutionNote?: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/inter-center-support/${id}/resolve`, {
+      resolution_note: resolutionNote
+    });
+    return response.data.data!;
+  }
+
+  async declineSupportRequest(id: string, declineReason: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/inter-center-support/${id}/decline`, {
+      decline_reason: declineReason
+    });
+    return response.data.data!;
+  }
 }
 
 export const apiService = new ApiService();

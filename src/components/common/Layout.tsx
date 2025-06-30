@@ -92,6 +92,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { text: 'Safety Management', icon: <Security />, path: '/admin/safety' },
           { text: 'Incident Reports', icon: <Report />, path: '/admin/reports' },
           { text: 'Emergency Escalations', icon: <Warning />, path: '/admin/escalations' },
+          { text: 'Inter-Center Support', icon: <AdminPanelSettings />, path: '/admin/inter-center-support' },
         ];
       case 'system_admin':
         return [

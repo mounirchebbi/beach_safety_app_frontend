@@ -34,6 +34,7 @@ import ShiftScheduling from './components/admin/ShiftScheduling';
 import SafetyManagement from './components/admin/SafetyManagement';
 import AdminIncidentReports from './components/admin/IncidentReports';
 import EscalationManagement from './components/admin/EscalationManagement';
+import InterCenterSupport from './components/admin/InterCenterSupport';
 
 // System Admin Pages
 import SystemDashboard from './components/system-admin/SystemDashboard';
@@ -183,6 +184,7 @@ const AppContent: React.FC = () => {
                 <Route path="/safety" element={<SafetyManagement />} />
                 <Route path="/reports" element={<AdminIncidentReports />} />
                 <Route path="/escalations" element={<EscalationManagement />} />
+                <Route path="/inter-center-support" element={<InterCenterSupport />} />
               </Routes>
             </ProtectedRoute>
           }
