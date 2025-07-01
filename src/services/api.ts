@@ -708,10 +708,83 @@ class ApiService {
   }
 
   async declineSupportRequest(id: string, declineReason: string): Promise<any> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/inter-center-support/${id}/decline`, {
-      decline_reason: declineReason
-    });
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/api/v1/inter-center-support/${id}/decline`, { decline_reason: declineReason });
     return response.data.data!;
+  }
+
+  // System Admin User Management
+  async getAllUsers(page: number = 1, limit: number = 10, filters?: {
+    role?: string;
+    center_id?: string;
+    search?: string;
+  }): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }> {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    
+    if (filters?.role) params.append('role', filters.role);
+    if (filters?.center_id) params.append('center_id', filters.center_id);
+    if (filters?.search) params.append('search', filters.search);
+
+    const response: AxiosResponse<{
+      success: boolean;
+      data: any[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      };
+    }> = await this.api.get(`/api/v1/auth/users?${params}`);
+    
+    return response.data;
+  }
+
+  async getUserById(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/api/v1/auth/users/${id}`);
+    return response.data.data!;
+  }
+
+  async createUser(userData: {
+    email: string;
+    password: string;
+    role: 'system_admin' | 'center_admin' | 'lifeguard';
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    center_id?: string;
+  }): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/api/v1/auth/users', userData);
+    return response.data.data!;
+  }
+
+  async updateUser(id: string, userData: Partial<{
+    email: string;
+    role: 'system_admin' | 'center_admin' | 'lifeguard';
+    first_name: string;
+    last_name: string;
+    phone: string;
+    center_id: string;
+    is_active: boolean;
+  }>): Promise<any> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.put(`/api/v1/auth/users/${id}`, userData);
+    return response.data.data!;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await this.api.delete(`/api/v1/auth/users/${id}`);
+  }
+
+  async resetUserPassword(id: string, newPassword: string): Promise<void> {
+    await this.api.post(`/api/v1/auth/users/${id}/reset-password`, { new_password: newPassword });
   }
 }
 
