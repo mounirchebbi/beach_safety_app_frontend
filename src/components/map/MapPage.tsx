@@ -81,7 +81,7 @@ const MapPage: React.FC = () => {
   const [showAlerts, setShowAlerts] = useState(true);
   const [showCenters, setShowCenters] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [selectedCenter, setSelectedCenter] = useState<BeachCenter | null>(null);
+
   const [selectedAlert, setSelectedAlert] = useState<MapAlert | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapView, setMapView] = useState<'satellite' | 'street' | 'hybrid'>('street');
@@ -249,7 +249,8 @@ const MapPage: React.FC = () => {
   }, []);
 
   const handleCenterClick = (center: BeachCenter) => {
-    setSelectedCenter(center);
+    // Center click functionality removed - no dialog will open
+    console.log('Center clicked:', center.name);
   };
 
   const handleAlertClick = (alert: MapAlert) => {
@@ -385,8 +386,6 @@ const MapPage: React.FC = () => {
                 {centers.map((center) => (
                   <ListItem
                     key={center.id}
-                    button
-                    onClick={() => handleCenterClick(center)}
                     sx={{ border: 1, borderColor: 'divider', borderRadius: 1, mb: 1 }}
                   >
                     <ListItemIcon>
@@ -501,92 +500,7 @@ const MapPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Center Details Dialog */}
-      <Dialog
-        open={!!selectedCenter}
-        onClose={() => setSelectedCenter(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        {selectedCenter && (
-          <>
-            <DialogTitle>
-              <Box display="flex" alignItems="center">
-                <LocationOn color="primary" sx={{ mr: 1 }} />
-                {selectedCenter.name}
-              </Box>
-            </DialogTitle>
-            <DialogContent>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Chip
-                    label={selectedCenter.status.toUpperCase()}
-                    color={getStatusColor(selectedCenter.status) as any}
-                    icon={<CheckCircle />}
-                  />
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Lifeguards on Duty
-                  </Typography>
-                  <Typography variant="h6">
-                    {selectedCenter.lifeguards_on_duty}
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Weather Condition
-                  </Typography>
-                  <Typography variant="h6">
-                    {selectedCenter.weather_condition}
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Air Temperature
-                  </Typography>
-                  <Typography variant="h6">
-                    {selectedCenter.air_temperature}°C
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Water Temperature
-                  </Typography>
-                  <Typography variant="h6">
-                    {selectedCenter.water_temperature}°C
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Wind Speed
-                  </Typography>
-                  <Typography variant="h6">
-                    {selectedCenter.wind_speed} km/h
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Visibility
-                  </Typography>
-                  <Typography variant="h6">
-                    {selectedCenter.visibility} km
-                  </Typography>
-                </Grid>
-              </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setSelectedCenter(null)}>Close</Button>
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
+
 
       {/* Alert Details Dialog */}
       <Dialog

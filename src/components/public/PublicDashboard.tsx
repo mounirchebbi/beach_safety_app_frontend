@@ -20,6 +20,15 @@ import {
   Fullscreen,
   Refresh,
   MyLocation,
+  WbSunny,
+  Air,
+  Waves,
+  Speed,
+  Cloud,
+  Opacity,
+  AcUnit,
+  Thunderstorm,
+  Grain,
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import { MapContainer, TileLayer, Circle, Marker, Popup, useMapEvents } from 'react-leaflet';
@@ -125,6 +134,31 @@ const PublicDashboard: React.FC = () => {
       case 'black': return 'Beach closed';
       default: return 'Status unknown';
     }
+  };
+
+  const getWeatherIcon = (weatherCondition: string) => {
+    const condition = weatherCondition.toLowerCase();
+    
+    if (condition.includes('cloud') || condition.includes('overcast')) {
+      return { icon: Cloud, color: '#78909c' };
+    }
+    if (condition.includes('rain') || condition.includes('drizzle') || condition.includes('shower')) {
+      return { icon: Opacity, color: '#2196f3' };
+    }
+    if (condition.includes('snow') || condition.includes('sleet')) {
+      return { icon: AcUnit, color: '#90caf9' };
+    }
+    if (condition.includes('storm') || condition.includes('thunder')) {
+      return { icon: Thunderstorm, color: '#673ab7' };
+    }
+    if (condition.includes('fog') || condition.includes('mist') || condition.includes('haze')) {
+      return { icon: Grain, color: '#9e9e9e' };
+    }
+    if (condition.includes('clear') || condition.includes('sunny')) {
+      return { icon: WbSunny, color: '#ff9800' };
+    }
+    // Default to sun for unknown conditions
+    return { icon: WbSunny, color: '#ff9800' };
   };
 
   const MapClickHandler: React.FC = () => {
@@ -284,66 +318,204 @@ const PublicDashboard: React.FC = () => {
               return (
                 <Marker key={center.id} position={centerCoords}>
                   <Popup>
-                    <Box sx={{ minWidth: 200 }}>
-                      <Typography variant="h6" fontWeight="bold" gutterBottom>
-                        {center.name}
-                      </Typography>
-                      
-                      {/* Safety Flag */}
-                      {safetyFlag && (
-                        <Box sx={{ mb: 2 }}>
-                          <Chip
-                            label={getFlagMessage(safetyFlag.flag_status)}
-                            sx={{
-                              bgcolor: getFlagColor(safetyFlag.flag_status),
-                              color: 'white',
-                              fontWeight: 'bold',
-                              width: '100%',
-                              mb: 1
-                            }}
-                          />
-                          {safetyFlag.reason && (
-                            <Typography variant="caption" color="text.secondary">
-                              {safetyFlag.reason}
-                            </Typography>
-                          )}
-                        </Box>
-                      )}
-
-                      {/* Weather Info */}
-                      {weather && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" fontWeight="bold">
-                            Weather: {weather.weather_condition}
-                          </Typography>
-                          <Typography variant="body2">
-                            Temp: {weather.temperature}°C | Wind: {weather.wind_speed} m/s
-                          </Typography>
-                          {weather.wave_height && (
-                            <Typography variant="body2">
-                              Waves: {weather.wave_height}m | Current: {weather.current_speed} m/s
-                            </Typography>
-                          )}
-                        </Box>
-                      )}
-
-                      {/* Lifeguard Info */}
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" fontWeight="bold">
-                          Lifeguards on Duty: {lifeguardCount}
+                    <Box sx={{ 
+                      minWidth: 280, 
+                      p: 0,
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                    }}>
+                      {/* Header Section */}
+                      <Box sx={{ 
+                        p: 2, 
+                        pb: 1.5,
+                        borderBottom: '1px solid #e8eaed',
+                        backgroundColor: '#fafbfc'
+                      }}>
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            fontWeight: 700,
+                            fontSize: '1.1rem',
+                            color: '#1a1a1a',
+                            mb: 0.5
+                          }}
+                        >
+                          {center.name}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: '#5f6368',
+                            fontSize: '0.75rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}
+                        >
+                          Beach Safety Center
                         </Typography>
                       </Box>
 
-                      <Button
-                        component={RouterLink}
-                        to="/map"
-                        variant="outlined"
-                        size="small"
-                        startIcon={<Map />}
-                        sx={{ width: '100%' }}
-                      >
-                        View Details
-                      </Button>
+                      {/* Content Section */}
+                      <Box sx={{ p: 2, pt: 1.5 }}>
+                        {/* Safety Status - Emphasized */}
+                        {safetyFlag && (
+                          <Box sx={{ mb: 2 }}>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              mb: 1,
+                              p: 2,
+                              borderRadius: 2,
+                              backgroundColor: getFlagColor(safetyFlag.flag_status) + '20',
+                              border: `2px solid ${getFlagColor(safetyFlag.flag_status)}`,
+                              boxShadow: `0 2px 8px ${getFlagColor(safetyFlag.flag_status)}30`
+                            }}>
+                              <Box sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                backgroundColor: getFlagColor(safetyFlag.flag_status),
+                                mr: 2,
+                                boxShadow: `0 0 8px ${getFlagColor(safetyFlag.flag_status)}`
+                              }} />
+                              <Box sx={{ flex: 1 }}>
+                                <Typography 
+                                  variant="body1" 
+                                  sx={{ 
+                                    fontWeight: 700,
+                                    color: getFlagColor(safetyFlag.flag_status),
+                                    fontSize: '1rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                >
+                                  {getFlagMessage(safetyFlag.flag_status)}
+                                </Typography>
+                                {safetyFlag.reason && (
+                                  <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                      color: '#5f6368',
+                                      fontSize: '0.75rem',
+                                      lineHeight: 1.4,
+                                      display: 'block',
+                                      mt: 0.5
+                                    }}
+                                  >
+                                    {safetyFlag.reason}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                          </Box>
+                        )}
+
+                        {/* Weather Information with Icons */}
+                        {weather && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                color: '#5f6368',
+                                fontSize: '0.7rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                fontWeight: 600,
+                                display: 'block',
+                                mb: 0.5
+                              }}
+                            >
+                              Current Conditions
+                            </Typography>
+                            <Box sx={{ 
+                              p: 1.5,
+                              backgroundColor: '#f8f9fa',
+                              borderRadius: 1,
+                              border: '1px solid #e8eaed'
+                            }}>
+                              <Box sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                mb: 1,
+                                p: 0.5,
+                                backgroundColor: '#ffffff',
+                                borderRadius: 1
+                              }}>
+                                {(() => {
+                                  const weatherIcon = getWeatherIcon(weather.weather_condition || 'clear');
+                                  const IconComponent = weatherIcon.icon;
+                                  return (
+                                    <IconComponent sx={{ 
+                                      fontSize: '1.2rem', 
+                                      color: weatherIcon.color, 
+                                      mr: 1 
+                                    }} />
+                                  );
+                                })()}
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ 
+                                    fontWeight: 600,
+                                    color: '#1a1a1a'
+                                  }}
+                                >
+                                  {weather.weather_condition || 'Clear'}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'auto 1fr', 
+                                gap: 1,
+                                fontSize: '0.8rem',
+                                alignItems: 'center'
+                              }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <WbSunny sx={{ fontSize: '0.9rem', color: '#ff9800', mr: 0.5 }} />
+                                  <Typography variant="caption" sx={{ color: '#5f6368' }}>
+                                    Temp
+                                  </Typography>
+                                </Box>
+                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+                                  {weather.temperature}°C
+                                </Typography>
+                                
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Air sx={{ fontSize: '0.9rem', color: '#2196f3', mr: 0.5 }} />
+                                  <Typography variant="caption" sx={{ color: '#5f6368' }}>
+                                    Wind
+                                  </Typography>
+                                </Box>
+                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+                                  {weather.wind_speed} m/s
+                                </Typography>
+                                
+                                {weather.wave_height && (
+                                  <>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Waves sx={{ fontSize: '0.9rem', color: '#00bcd4', mr: 0.5 }} />
+                                      <Typography variant="caption" sx={{ color: '#5f6368' }}>
+                                        Waves
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+                                      {weather.wave_height}m
+                                    </Typography>
+                                    
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Speed sx={{ fontSize: '0.9rem', color: '#9c27b0', mr: 0.5 }} />
+                                      <Typography variant="caption" sx={{ color: '#5f6368' }}>
+                                        Current
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+                                      {weather.current_speed} m/s
+                                    </Typography>
+                                  </>
+                                )}
+                              </Box>
+                            </Box>
+                          </Box>
+                        )}
+                      </Box>
                     </Box>
                   </Popup>
                 </Marker>

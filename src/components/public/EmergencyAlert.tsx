@@ -56,7 +56,7 @@ const EmergencyAlert: React.FC = () => {
 
   const [formData, setFormData] = useState<EmergencyAlertData>({
     location: null,
-    description: '',
+    description: 'SOS',
     alert_type: 'sos',
     severity: 'critical'
   });
@@ -198,7 +198,7 @@ const EmergencyAlert: React.FC = () => {
     setAlertSent(false);
     setFormData({
       location: null,
-      description: '',
+      description: 'SOS',
       alert_type: 'sos',
       severity: 'critical'
     });

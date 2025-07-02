@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-le
 import { Icon, LatLng } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Box, Typography, Paper, Chip, Alert } from '@mui/material';
-import { BeachAccess, Warning, CheckCircle, LocationOn } from '@mui/icons-material';
+import { BeachAccess, Warning, CheckCircle, LocationOn, WbSunny, Air, Visibility, Person } from '@mui/icons-material';
 import { SafetyZone } from '../../types';
 
 // Fix for default markers in react-leaflet
@@ -290,69 +290,301 @@ const BeachMap: React.FC<BeachMapProps> = ({
             }}
           >
             <Popup>
-              <Box sx={{ minWidth: 250 }}>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  {center.name}
-                </Typography>
-                
-                {/* Safety Flag Status - Main Info */}
+              <Box sx={{ 
+                minWidth: 320, 
+                p: 2,
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif'
+              }}>
+                {/* Professional Header */}
                 <Box sx={{ 
-                  mb: 2, 
-                  p: 1.5, 
-                  borderRadius: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  mb: 2.5,
+                  pb: 1.5,
+                  borderBottom: '3px solid #1976d2',
+                  position: 'relative'
+                }}>
+                  <Box sx={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 4,
+                    backgroundColor: '#1976d2',
+                    borderRadius: '2px'
+                  }} />
+                  <LocationOn sx={{ color: '#1976d2', mr: 1.5, fontSize: 28 }} />
+                  <Typography 
+                    variant="h6" 
+                    fontWeight="700" 
+                    color="primary"
+                    sx={{ 
+                      fontSize: '1.1rem',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {center.name}
+                  </Typography>
+                </Box>
+                
+                {/* Enhanced Safety Flag Status */}
+                <Box sx={{ 
+                  mb: 3, 
+                  p: 2.5, 
+                  borderRadius: 3, 
                   backgroundColor: getFlagColor(center.flag_status),
                   color: 'white',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '3px',
+                    backgroundColor: 'rgba(255,255,255,0.3)'
+                  }
                 }}>
-                  <Typography variant="h6" fontWeight="bold">
+                  <Typography 
+                    variant="h6" 
+                    fontWeight="800" 
+                    sx={{ 
+                      mb: 0.5,
+                      fontSize: '1.1rem',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                    }}
+                  >
                     {getFlagText(center.flag_status)}
                   </Typography>
                   {center.flag_reason && (
-                    <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        opacity: 0.95, 
+                        fontSize: '0.9rem',
+                        fontWeight: 500
+                      }}
+                    >
                       {center.flag_reason}
                     </Typography>
                   )}
                 </Box>
                 
-                <Chip
-                  icon={getStatusIcon(center.status)}
-                  label={center.status.toUpperCase()}
-                  color={getStatusColor(center.status) as any}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
+                {/* Enhanced Status and Lifeguards Row */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  mb: 2.5,
+                  p: 1.5,
+                  bgcolor: '#f8f9fa',
+                  borderRadius: 2,
+                  border: '1px solid #e9ecef'
+                }}>
+                  <Chip
+                    icon={getStatusIcon(center.status)}
+                    label={center.status.toUpperCase()}
+                    color={getStatusColor(center.status) as any}
+                    size="small"
+                    sx={{ 
+                      fontWeight: '700',
+                      fontSize: '0.75rem',
+                      height: 28
+                    }}
+                  />
+                  <Box sx={{ 
+                    textAlign: 'center',
+                    p: 1.5,
+                    bgcolor: '#e3f2fd',
+                    borderRadius: 2,
+                    border: '2px solid #bbdefb',
+                    minWidth: 80
+                  }}>
+                    <Person sx={{ color: '#1976d2', mb: 0.5, fontSize: 20 }} />
+                    <Typography 
+                      variant="h5" 
+                      fontWeight="800" 
+                      color="primary"
+                      sx={{ fontSize: '1.5rem', lineHeight: 1 }}
+                    >
+                      {center.lifeguards_on_duty}
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      On Duty
+                    </Typography>
+                  </Box>
+                </Box>
                 
-                <Typography variant="body2" gutterBottom>
-                  <strong>Lifeguards on Duty:</strong> {center.lifeguards_on_duty}
-                </Typography>
+                {/* Enhanced Weather Information Grid */}
+                <Box sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr 1fr', 
+                  gap: 2,
+                  mb: 2.5
+                }}>
+                  <Box sx={{ 
+                    textAlign: 'center', 
+                    p: 2, 
+                    bgcolor: '#fff', 
+                    borderRadius: 2.5,
+                    border: '2px solid #f0f0f0',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    '&:hover': {
+                      bgcolor: '#fafafa',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      borderColor: '#ff9800'
+                    }
+                  }}>
+                    <WbSunny sx={{ color: '#ff9800', mb: 1, fontSize: 24 }} />
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="800" 
+                      color="primary"
+                      sx={{ fontSize: '1.1rem', mb: 0.5 }}
+                    >
+                      {center.air_temperature}°C
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      Air Temp
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    textAlign: 'center', 
+                    p: 2, 
+                    bgcolor: '#fff', 
+                    borderRadius: 2.5,
+                    border: '2px solid #f0f0f0',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    '&:hover': {
+                      bgcolor: '#fafafa',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      borderColor: '#4caf50'
+                    }
+                  }}>
+                    <Air sx={{ color: '#4caf50', mb: 1, fontSize: 24 }} />
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="800" 
+                      color="primary"
+                      sx={{ fontSize: '1.1rem', mb: 0.5 }}
+                    >
+                      {center.wind_speed}
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      Wind (km/h)
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    textAlign: 'center', 
+                    p: 2, 
+                    bgcolor: '#fff', 
+                    borderRadius: 2.5,
+                    border: '2px solid #f0f0f0',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    '&:hover': {
+                      bgcolor: '#fafafa',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      borderColor: '#9c27b0'
+                    }
+                  }}>
+                    <Visibility sx={{ color: '#9c27b0', mb: 1, fontSize: 24 }} />
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="800" 
+                      color="primary"
+                      sx={{ fontSize: '1.1rem', mb: 0.5 }}
+                    >
+                      {center.wave_height}
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      Waves (m)
+                    </Typography>
+                  </Box>
+                </Box>
                 
-                <Typography variant="body2" gutterBottom>
-                  <strong>Weather:</strong> {center.weather_condition}
-                </Typography>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Water Temp:</strong> {center.water_temperature}°C
-                </Typography>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Air Temp:</strong> {center.air_temperature}°C
-                </Typography>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Wind:</strong> {center.wind_speed} km/h
-                </Typography>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Visibility:</strong> {center.visibility} km
-                </Typography>
-
-                <Typography variant="body2" gutterBottom>
-                  <strong>Wave Height:</strong> {center.wave_height} m
-                </Typography>
-                
-                <Typography variant="body2">
-                  <strong>Current Speed:</strong> {center.current_speed} m/s
-                </Typography>
+                {/* Enhanced Additional Info */}
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: '#f8f9fa', 
+                  borderRadius: 2,
+                  border: '1px solid #e9ecef',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
+                }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      mb: 1,
+                      fontWeight: 600,
+                      color: '#2c3e50'
+                    }}
+                  >
+                    <strong>Weather:</strong> {center.weather_condition}
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      mb: 1,
+                      fontWeight: 600,
+                      color: '#2c3e50'
+                    }}
+                  >
+                    <strong>Visibility:</strong> {center.visibility} km
+                  </Typography>
+                  <Typography 
+                    variant="body2"
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#2c3e50'
+                    }}
+                  >
+                    <strong>Current:</strong> {center.current_speed} m/s
+                  </Typography>
+                </Box>
               </Box>
             </Popup>
           </Marker>
@@ -374,21 +606,102 @@ const BeachMap: React.FC<BeachMapProps> = ({
               }}
             >
               <Popup>
-                <Box sx={{ minWidth: 200 }}>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom>
-                    {getSafetyZoneLabel(zone.zone_type)}
-                  </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Name:</strong> {zone.name}
-                  </Typography>
-                  {zone.description && (
-                    <Typography variant="body2" gutterBottom>
-                      {zone.description}
+                <Box sx={{ 
+                  minWidth: 280, 
+                  p: 2,
+                  fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif'
+                }}>
+                  {/* Professional Header */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    mb: 2,
+                    pb: 1,
+                    borderBottom: '2px solid #e0e0e0'
+                  }}>
+                    <Box sx={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      backgroundColor: getSafetyZoneColor(zone.zone_type),
+                      mr: 1.5,
+                      border: '2px solid white',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }} />
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="700" 
+                      sx={{ 
+                        fontSize: '1rem',
+                        color: getSafetyZoneColor(zone.zone_type),
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      {getSafetyZoneLabel(zone.zone_type)}
                     </Typography>
-                  )}
-                  <Typography variant="body2" sx={{ mt: 1 }}>
-                    <strong>Radius:</strong> {Math.round(radius)}m
-                  </Typography>
+                  </Box>
+                  
+                  {/* Zone Information */}
+                  <Box sx={{ mb: 2 }}>
+                    <Typography 
+                      variant="body1" 
+                      fontWeight="600" 
+                      sx={{ 
+                        mb: 1,
+                        color: '#2c3e50',
+                        fontSize: '0.95rem'
+                      }}
+                    >
+                      {zone.name}
+                    </Typography>
+                    {zone.description && (
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          mb: 1.5,
+                          color: '#5a6c7d',
+                          lineHeight: 1.4,
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        {zone.description}
+                      </Typography>
+                    )}
+                  </Box>
+                  
+                  {/* Zone Details */}
+                  <Box sx={{ 
+                    p: 1.5, 
+                    bgcolor: '#f8f9fa', 
+                    borderRadius: 2,
+                    border: '1px solid #e9ecef',
+                    textAlign: 'center'
+                  }}>
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="800" 
+                      sx={{ 
+                        color: getSafetyZoneColor(zone.zone_type),
+                        fontSize: '1.2rem',
+                        mb: 0.5
+                      }}
+                    >
+                      {Math.round(radius)}m
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        color: '#6c757d'
+                      }}
+                    >
+                      Safety Radius
+                    </Typography>
+                  </Box>
                 </Box>
               </Popup>
             </Circle>
@@ -406,28 +719,91 @@ const BeachMap: React.FC<BeachMapProps> = ({
             }}
           >
             <Popup>
-              <Box sx={{ minWidth: 200 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Box sx={{ 
+                minWidth: 280, 
+                p: 2,
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif'
+              }}>
+                {/* Professional Header */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  mb: 2,
+                  pb: 1,
+                  borderBottom: '2px solid #e0e0e0'
+                }}>
                   {getAlertIcon(alert.type)}
-                  <Typography variant="h6" fontWeight="bold" sx={{ ml: 1 }}>
-                    {alert.type.toUpperCase()} Alert
+                  <Typography 
+                    variant="h6" 
+                    fontWeight="700" 
+                    sx={{ 
+                      ml: 1,
+                      fontSize: '1rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      color: alert.status === 'active' ? '#d32f2f' : '#2e7d32'
+                    }}
+                  >
+                    {alert.type} Alert
                   </Typography>
                 </Box>
                 
-                <Chip
-                  label={alert.status.toUpperCase()}
-                  color={alert.status === 'active' ? 'error' : 'success'}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
+                {/* Status Chip */}
+                <Box sx={{ mb: 2 }}>
+                  <Chip
+                    label={alert.status.toUpperCase()}
+                    color={alert.status === 'active' ? 'error' : 'success'}
+                    size="small"
+                    sx={{ 
+                      fontWeight: '700',
+                      fontSize: '0.7rem',
+                      height: 24
+                    }}
+                  />
+                </Box>
                 
-                <Typography variant="body2" gutterBottom>
-                  {alert.description}
-                </Typography>
+                {/* Alert Description */}
+                <Box sx={{ 
+                  mb: 2,
+                  p: 1.5,
+                  bgcolor: alert.status === 'active' ? '#fff3e0' : '#f1f8e9',
+                  borderRadius: 2,
+                  border: `1px solid ${alert.status === 'active' ? '#ffcc02' : '#4caf50'}`
+                }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: '#2c3e50',
+                      fontWeight: 500,
+                      lineHeight: 1.4,
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {alert.description}
+                  </Typography>
+                </Box>
                 
-                <Typography variant="caption" color="text.secondary">
-                  {new Date(alert.created_at).toLocaleString()}
-                </Typography>
+                {/* Timestamp */}
+                <Box sx={{ 
+                  textAlign: 'center',
+                  p: 1,
+                  bgcolor: '#f8f9fa',
+                  borderRadius: 1,
+                  border: '1px solid #e9ecef'
+                }}>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      color: '#6c757d',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {new Date(alert.created_at).toLocaleString()}
+                  </Typography>
+                </Box>
               </Box>
             </Popup>
           </Marker>
