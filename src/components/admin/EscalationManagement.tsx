@@ -48,6 +48,22 @@ import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import { EmergencyEscalation } from '../../types';
 
+// Safe date formatting function
+const formatDate = (dateString: string | null | undefined, formatString: string = 'MMM dd, yyyy HH:mm'): string => {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    return format(date, formatString);
+  } catch (error) {
+    console.error('Error formatting date:', dateString, error);
+    return 'Invalid Date';
+  }
+};
+
 const EscalationManagement: React.FC = () => {
   const { user } = useAuth();
   const [escalations, setEscalations] = useState<EmergencyEscalation[]>([]);
@@ -282,7 +298,7 @@ const EscalationManagement: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {format(new Date(escalation.created_at), 'MMM dd, yyyy HH:mm')}
+                            {formatDate(escalation.created_at)}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -444,7 +460,7 @@ const EscalationManagement: React.FC = () => {
                     Created
                   </Typography>
                   <Typography variant="body1">
-                    {format(new Date(selectedEscalation.created_at), 'MMM dd, yyyy HH:mm')}
+                    {formatDate(selectedEscalation.created_at)}
                   </Typography>
                 </Grid>
 
@@ -453,7 +469,7 @@ const EscalationManagement: React.FC = () => {
                     Last Updated
                   </Typography>
                   <Typography variant="body1">
-                    {format(new Date(selectedEscalation.updated_at), 'MMM dd, yyyy HH:mm')}
+                    {formatDate(selectedEscalation.updated_at)}
                   </Typography>
                 </Grid>
 
@@ -464,7 +480,7 @@ const EscalationManagement: React.FC = () => {
                       Acknowledged
                     </Typography>
                     <Typography variant="body1">
-                      {format(new Date(selectedEscalation.acknowledged_at), 'MMM dd, yyyy HH:mm')}
+                      {formatDate(selectedEscalation.acknowledged_at)}
                     </Typography>
                   </Grid>
                 )}
@@ -476,7 +492,7 @@ const EscalationManagement: React.FC = () => {
                       Resolved
                     </Typography>
                     <Typography variant="body1">
-                      {format(new Date(selectedEscalation.resolved_at), 'MMM dd, yyyy HH:mm')}
+                      {formatDate(selectedEscalation.resolved_at)}
                     </Typography>
                   </Grid>
                 )}

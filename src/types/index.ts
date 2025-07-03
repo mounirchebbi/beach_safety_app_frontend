@@ -1,3 +1,21 @@
+// GeoJSON Types
+declare namespace GeoJSON {
+  interface Point {
+    type: 'Point';
+    coordinates: [number, number]; // [longitude, latitude]
+  }
+
+  interface Polygon {
+    type: 'Polygon';
+    coordinates: number[][][]; // Array of linear rings, first is exterior, rest are holes
+  }
+
+  interface MultiPolygon {
+    type: 'MultiPolygon';
+    coordinates: number[][][][]; // Array of polygons
+  }
+}
+
 // User Types
 export interface User {
   id: string;

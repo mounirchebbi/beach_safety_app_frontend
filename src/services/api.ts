@@ -458,8 +458,7 @@ class ApiService {
   async createSafetyZone(centerId: string, zoneData: {
     name: string;
     zone_type: 'no_swim' | 'caution' | 'safe';
-    location: { lat: number; lng: number };
-    radius: number;
+    geometry: GeoJSON.Polygon;
     description?: string;
   }): Promise<SafetyZone> {
     const response: AxiosResponse<ApiResponse<SafetyZone>> = await this.api.post(`/api/v1/safety-zones/centers/${centerId}`, zoneData);
@@ -469,8 +468,7 @@ class ApiService {
   async updateSafetyZone(zoneId: string, zoneData: {
     name?: string;
     zone_type?: 'no_swim' | 'caution' | 'safe';
-    location?: { lat: number; lng: number };
-    radius?: number;
+    geometry?: GeoJSON.Polygon;
     description?: string;
   }): Promise<SafetyZone> {
     const response: AxiosResponse<ApiResponse<SafetyZone>> = await this.api.put(`/api/v1/safety-zones/${zoneId}`, zoneData);
@@ -634,8 +632,8 @@ class ApiService {
   async createInterCenterSupportRequest(requestData: {
     target_center_id: string;
     escalation_id?: string;
-    request_type: 'personnel_support' | 'equipment_support' | 'medical_support' | 'coordination_support';
-    priority: 'low' | 'medium' | 'high';
+    request_type: 'personnel_support' | 'equipment_support' | 'medical_support' | 'evacuation_support' | 'coordination_support';
+    priority: 'low' | 'medium' | 'high' | 'critical';
     title: string;
     description: string;
     requested_resources?: any;

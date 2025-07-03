@@ -134,21 +134,50 @@ const NoSwimZoneManagement: React.FC<NoSwimZoneManagementProps> = ({ centerId })
     }
 
     try {
+      // Convert location and radius to GeoJSON geometry (circle)
+      const createCircleGeometry = (center: { lat: number; lng: number }, radiusInMeters: number): GeoJSON.Polygon => {
+        // Convert radius from meters to degrees (approximate)
+        const latRad = center.lat * Math.PI / 180;
+        const metersPerDegreeLat = 111320;
+        const metersPerDegreeLng = 111320 * Math.cos(latRad);
+        const radiusInDegreesLat = radiusInMeters / metersPerDegreeLat;
+        const radiusInDegreesLng = radiusInMeters / metersPerDegreeLng;
+
+        // Create a circle approximation using 32 points
+        const points: [number, number][] = [];
+        for (let i = 0; i < 32; i++) {
+          const angle = (i * 2 * Math.PI) / 32;
+          const lat = center.lat + radiusInDegreesLat * Math.cos(angle);
+          const lng = center.lng + radiusInDegreesLng * Math.sin(angle);
+          points.push([lng, lat]); // GeoJSON uses [lng, lat] order
+        }
+        // Close the polygon
+        points.push(points[0]);
+
+        return {
+          type: 'Polygon' as const,
+          coordinates: [points]
+        };
+      };
+
+      const geometry = createCircleGeometry(formData.location, formData.radius);
+
       if (editingZone) {
         const updateData = {
-          ...formData,
-          location: formData.location || undefined
+          name: formData.name,
+          zone_type: formData.zone_type,
+          geometry: geometry,
+          description: formData.description
         };
         await apiService.updateSafetyZone(editingZone.id, updateData);
       } else {
-        if (!formData.location) {
-          setError('Please select a location on the map');
-          return;
-        }
-        await apiService.createSafetyZone(centerId, {
-          ...formData,
-          location: formData.location
-        });
+        const createData = {
+          name: formData.name,
+          zone_type: formData.zone_type,
+          geometry: geometry,
+          description: formData.description
+        };
+        await apiService.createSafetyZone(centerId, createData);
       }
       
       handleCloseDialog();

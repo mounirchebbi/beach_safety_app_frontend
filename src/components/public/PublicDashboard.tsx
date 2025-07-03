@@ -10,6 +10,7 @@ import {
   IconButton,
   Tooltip,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   Warning,
@@ -30,12 +31,14 @@ import {
   Thunderstorm,
   Grain,
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Circle, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { apiService } from '../../services/api';
 import { Center, WeatherData, SafetyZone } from '../../types';
 import EmergencyAlert from './EmergencyAlert';
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
 
 // Fix for default markers
 import L from 'leaflet';
@@ -75,7 +78,14 @@ const PublicDashboard: React.FC = () => {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false);
-  const [locationSource, setLocationSource] = useState<'gps' | 'manual' | null>(null);
+  const [locationSource, setLocationSource] = useState<'gps' | 'manual' | 'mobile' | null>(null);
+  const navigate = useNavigate();
+  const [searchValue, setSearchValue] = useState('');
+  const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [gpsWeather, setGpsWeather] = useState<any>(null);
+  const [forecast, setForecast] = useState<any[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -104,7 +114,10 @@ const PublicDashboard: React.FC = () => {
   };
 
   const getWeatherForCenter = (centerId: string) => {
-    return weatherData.find(w => w.center_id === centerId);
+    const weather = weatherData.find(w => w.center_id === centerId);
+    console.log(`Looking for weather for center ${centerId}:`, weather);
+    console.log('Available weather data:', weatherData);
+    return weather;
   };
 
   const getLifeguardCountForCenter = (centerId: string) => {
@@ -178,44 +191,74 @@ const PublicDashboard: React.FC = () => {
     setLocationError(null);
     setIsManualMode(false);
 
+    console.log('Starting location request...');
+    console.log('navigator.geolocation available:', !!navigator.geolocation);
+
     if (!navigator.geolocation) {
       setLocationError('Geolocation is not supported by this browser');
       setIsLocating(false);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation([latitude, longitude]);
-        setLocationSource('gps');
-        setIsLocating(false);
-      },
-      (error) => {
-        console.error('Error getting location:', error);
-        let errorMessage = 'Unable to get your location';
-        
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location services or use manual mode.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information unavailable.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out.';
-            break;
-        }
-        
-        setLocationError(errorMessage);
-        setIsLocating(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000
-      }
-    );
+    // Test with different options
+    const testLocation = (options: PositionOptions, attempt: number = 1) => {
+      console.log(`Location attempt ${attempt} with options:`, options);
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          console.log('Location success:', { latitude, longitude, accuracy });
+          setUserLocation([latitude, longitude]);
+          setLocationSource('gps');
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error(`Location attempt ${attempt} failed:`, error);
+          console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            PERMISSION_DENIED: error.PERMISSION_DENIED,
+            POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
+            TIMEOUT: error.TIMEOUT
+          });
+          
+          let errorMessage = 'Unable to get your location';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Location access denied. Please enable location services or use manual mode.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              if (attempt === 1) {
+                console.log('Trying with lower accuracy...');
+                testLocation({
+                  enableHighAccuracy: false,
+                  timeout: 15000,
+                  maximumAge: 300000
+                }, 2);
+                return;
+              } else {
+                errorMessage = 'GPS unavailable. You can set your location manually by clicking the map.';
+              }
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out.';
+              break;
+          }
+          
+          setLocationError(errorMessage);
+          setIsLocating(false);
+        },
+        options
+      );
+    };
+
+    // Start with high accuracy
+    testLocation({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 60000
+    });
   };
 
   const enableManualMode = () => {
@@ -237,10 +280,95 @@ const PublicDashboard: React.FC = () => {
     setLocationSource(null);
   };
 
+  const getMobileGPSLocation = async () => {
+    setIsLocating(true);
+    setLocationError(null);
+    setIsManualMode(false);
+
+    try {
+      console.log('Fetching GPS data from mobile device via backend proxy...');
+      
+      const response = await fetch('/api/v1/public/mobile-gps', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Mobile GPS data received:', result);
+
+      if (!result.success || !result.data) {
+        throw new Error(result.message || 'Invalid response from mobile GPS service');
+      }
+
+      const { latitude, longitude } = result.data;
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        throw new Error('Invalid GPS coordinates received');
+      }
+
+      console.log('Setting mobile GPS location:', { latitude, longitude });
+      setUserLocation([latitude, longitude]);
+      setLocationSource('mobile');
+      setIsLocating(false);
+      setLocationError(null);
+
+    } catch (error: any) {
+      console.error('Error fetching mobile GPS:', error);
+      const errorMessage = error.message || 'Connection failed';
+      setLocationError(`Mobile GPS unavailable: ${errorMessage}. Please try GPS or manual mode.`);
+      setIsLocating(false);
+    }
+  };
+
+  // Fetch weather for current userLocation
+  useEffect(() => {
+    const fetchWeatherForLocation = async () => {
+      if (!userLocation) return;
+      setWeatherLoading(true);
+      setWeatherError(null);
+      try {
+        // Use OpenWeatherMap API directly for current location
+        const apiKey = process.env.REACT_APP_OPENWEATHER_API_KEY || 'b87cedaabede7999b6b157950fe31164';
+        const [lat, lon] = userLocation;
+        const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`);
+        const weatherData = await weatherRes.json();
+        if (!weatherRes.ok) throw new Error(weatherData.message || 'Failed to fetch weather');
+        setGpsWeather(weatherData);
+        // Fetch forecast
+        const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`);
+        const forecastData = await forecastRes.json();
+        if (!forecastRes.ok) throw new Error(forecastData.message || 'Failed to fetch forecast');
+        setForecast(forecastData.list.slice(0, 5)); // Next 5 periods (about 1 day)
+      } catch (err: any) {
+        setWeatherError(err.message);
+      } finally {
+        setWeatherLoading(false);
+      }
+    };
+    fetchWeatherForLocation();
+  }, [userLocation]);
+
   return (
-    <Box sx={{ p: 0 }}>
-      {/* Hero Section with Map */}
-      <Box sx={{ position: 'relative', height: '70vh', minHeight: '500px' }}>
+    <Box sx={{ height: '100vh', width: '100vw', bgcolor: '#f4f6fa' }}>
+      {/* Header Bar */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2, bgcolor: '#fff', boxShadow: 1, position: 'sticky', top: 0, zIndex: 1200 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <img src="/logo192.png" alt="Beach Safety Logo" style={{ height: 40, cursor: 'pointer' }} onClick={() => navigate('/')} />
+        </Box>
+        <Button variant="contained" color="primary" onClick={() => navigate('/login')} sx={{ fontWeight: 700, borderRadius: 2 }}>
+          Staff Login
+        </Button>
+      </Box>
+
+      {/* Main Map Section (map and overlays only) */}
+      <Box sx={{ position: 'relative', height: 'calc(100vh - 72px)', width: '100vw' }}>
         {/* Map Container */}
         <Box sx={{ height: '100%', width: '100%' }}>
           <MapContainer
@@ -273,9 +401,17 @@ const PublicDashboard: React.FC = () => {
                         Lng: {userLocation[1].toFixed(6)}
                       </Typography>
                       <Chip 
-                        label={locationSource === 'gps' ? 'GPS Location' : 'Manual Location'} 
+                        label={
+                          locationSource === 'gps' ? 'GPS Location' : 
+                          locationSource === 'mobile' ? 'Mobile GPS' : 
+                          'Manual Location'
+                        } 
                         size="small" 
-                        color={locationSource === 'gps' ? 'primary' : 'secondary'}
+                        color={
+                          locationSource === 'gps' ? 'primary' : 
+                          locationSource === 'mobile' ? 'success' : 
+                          'secondary'
+                        }
                         sx={{ mt: 1, mb: 1 }}
                       />
                       <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
@@ -314,6 +450,8 @@ const PublicDashboard: React.FC = () => {
                 center.location.coordinates[1],
                 center.location.coordinates[0]
               ];
+
+              console.log(`Center ${center.name} (${center.id}) weather:`, weather);
 
               return (
                 <Marker key={center.id} position={centerCoords}>
@@ -597,6 +735,16 @@ const PublicDashboard: React.FC = () => {
                 <MyLocation />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Get Mobile GPS Location">
+              <IconButton 
+                onClick={getMobileGPSLocation} 
+                size="small"
+                disabled={isLocating}
+                color={locationSource === 'mobile' ? 'success' : 'default'}
+              >
+                <Visibility />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Set Location Manually">
               <IconButton 
                 onClick={enableManualMode} 
@@ -645,115 +793,189 @@ const PublicDashboard: React.FC = () => {
 
         {/* Location Error Alert */}
         {locationError && (
-          <Box sx={{ position: 'absolute', top: 20, left: 20, zIndex: 1000, maxWidth: 400 }}>
+          <Box sx={{ position: 'absolute', top: 20, left: 20, zIndex: 1000, maxWidth: 500 }}>
             <Alert 
-              severity="error" 
+              severity="warning" 
               onClose={() => setLocationError(null)}
               sx={{ mb: 1 }}
             >
-              {locationError}
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                Location Service Issue
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                {locationError}
+              </Typography>
+              <Typography variant="caption" sx={{ mb: 2, display: 'block', color: 'text.secondary' }}>
+                💡 Tip: You can still use the map by clicking anywhere to set your location manually.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={getUserLocation}
+                  disabled={isLocating}
+                  startIcon={isLocating ? <CircularProgress size={16} /> : <MyLocation />}
+                  sx={{ fontWeight: 'bold' }}
+                >
+                  Retry GPS
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={getMobileGPSLocation}
+                  disabled={isLocating}
+                  startIcon={<Visibility />}
+                  color="success"
+                >
+                  Mobile GPS
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={enableManualMode}
+                  startIcon={<Map />}
+                >
+                  Set Manually
+                </Button>
+              </Box>
             </Alert>
           </Box>
         )}
 
-        {/* Map Info Overlay */}
-        <Box sx={{ position: 'absolute', bottom: 20, left: 20, zIndex: 1000 }}>
-          <Paper sx={{ p: 2, maxWidth: 300 }}>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Interactive Safety Map
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              View real-time beach conditions, safety zones, and lifeguard locations. Click on markers for detailed information.
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip label="Safety Flags" size="small" color="primary" />
-              <Chip label="Weather Data" size="small" color="info" />
-              <Chip label="Safety Zones" size="small" color="success" />
+        {/* Emergency Button (floating, unchanged) */}
+        <Box sx={{ position: 'fixed', bottom: 32, right: 32, zIndex: 1300 }}>
+          {/* Existing Emergency Button code here */}
+        </Box>
+
+        {/* Weather Panel (floating, bottom left) */}
+        {userLocation && (
+          <Paper elevation={6} sx={{ position: 'absolute', bottom: 32, left: 32, minWidth: 260, maxWidth: 340, p: 2, zIndex: 1201, borderRadius: 3, bgcolor: '#f8fafd', boxShadow: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              {(() => {
+                let IconComponent = WbSunny;
+                let iconColor = '#ff9800';
+                if (gpsWeather && gpsWeather.weather && gpsWeather.weather[0]) {
+                  const condition = gpsWeather.weather[0].main.toLowerCase();
+                  if (condition.includes('cloud') || condition.includes('overcast')) {
+                    IconComponent = Cloud; iconColor = '#78909c';
+                  } else if (condition.includes('rain') || condition.includes('drizzle') || condition.includes('shower')) {
+                    IconComponent = Opacity; iconColor = '#2196f3';
+                  } else if (condition.includes('snow') || condition.includes('sleet')) {
+                    IconComponent = AcUnit; iconColor = '#90caf9';
+                  } else if (condition.includes('storm') || condition.includes('thunder')) {
+                    IconComponent = Thunderstorm; iconColor = '#673ab7';
+                  } else if (condition.includes('fog') || condition.includes('mist') || condition.includes('haze')) {
+                    IconComponent = Grain; iconColor = '#9e9e9e';
+                  } else if (condition.includes('clear') || condition.includes('sunny')) {
+                    IconComponent = WbSunny; iconColor = '#ff9800';
+                  }
+                }
+                return <IconComponent sx={{ fontSize: 36, color: iconColor, mr: 1 }} />;
+              })()}
+              <Typography variant="h6" fontWeight={700}>Weather at your location</Typography>
             </Box>
+            {weatherLoading ? (
+              <Box display="flex" alignItems="center" justifyContent="center" py={2}><CircularProgress size={28} /></Box>
+            ) : weatherError ? (
+              <Alert severity="error">{weatherError}</Alert>
+            ) : gpsWeather ? (
+              <Box>
+                <Typography variant="body1" fontWeight={600}>{gpsWeather.weather?.[0]?.main || 'N/A'}</Typography>
+                <Typography variant="body2">{gpsWeather.name || ''}</Typography>
+                <Typography variant="body2">Temp: {gpsWeather.main?.temp}°C, Feels: {gpsWeather.main?.feels_like}°C</Typography>
+                <Typography variant="body2">Humidity: {gpsWeather.main?.humidity}%</Typography>
+                <Typography variant="body2">Wind: {gpsWeather.wind?.speed} m/s</Typography>
+                <Typography variant="body2">Visibility: {gpsWeather.visibility / 1000} km</Typography>
+                <Typography variant="subtitle2" sx={{ mt: 2 }}>Forecast:</Typography>
+                <Box>
+                  {forecast.map((f, idx) => (
+                    <Typography key={idx} variant="caption" display="block">
+                      {new Date(f.dt * 1000).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}: {f.main.temp}°C, {f.weather[0].main}
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
+            ) : (
+              <Typography variant="body2">No weather data</Typography>
+            )}
           </Paper>
+        )}
+
+        {/* Quick Search for Centers (floating) */}
+        <Box sx={{ position: 'absolute', top: 32, left: 32, zIndex: 1201, minWidth: 260, maxWidth: 340 }}>
+          <Autocomplete
+            options={centers}
+            getOptionLabel={(option) => option.name}
+            value={selectedCenter}
+            onChange={(_, value) => {
+              setSelectedCenter(value);
+              if (value) {
+                setUserLocation([
+                  value.location.coordinates[1],
+                  value.location.coordinates[0]
+                ]);
+              }
+            }}
+            inputValue={searchValue}
+            onInputChange={(_, value) => setSearchValue(value)}
+            renderInput={(params) => (
+              <TextField {...params} label="Search Center" variant="outlined" size="small" />
+            )}
+          />
         </Box>
       </Box>
 
-      {/* Quick Stats */}
-      <Box sx={{ p: 3, bgcolor: 'background.default' }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ textAlign: 'center', p: 2 }}>
-              <CheckCircle sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
-              <Typography variant="h4" fontWeight="bold" color="success.main">
-                {centers.length}
+      {/* How to Use the App Instructions (below the map) */}
+      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mt: 4, mb: 2 }}>
+        <Paper elevation={4} sx={{ p: 4, borderRadius: 3, bgcolor: '#fffbe7', boxShadow: 2, maxWidth: 700, width: '100%' }}>
+          <Typography variant="h5" fontWeight={700} gutterBottom color="primary.main" sx={{ mb: 3, textAlign: 'center' }}>
+            How to Use the App
+          </Typography>
+          <Box sx={{ display: 'grid', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.5)' }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '1.1rem' }}>
+                Allow location access for personalized weather and map features.
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Active Beach Centers
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.5)' }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.main', mt: 0.5, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '1.1rem' }}>
+                Use the <Box component="span" sx={{ fontWeight: 700, color: 'error.main' }}>EMERGENCY</Box> button for urgent help.
               </Typography>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ textAlign: 'center', p: 2 }}>
-              <Security sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h4" fontWeight="bold" color="primary.main">
-                {safetyZones.length}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.5)' }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '1.1rem' }}>
+                Click markers on the map for center details and real-time info.
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Safety Zones Monitored
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.5)' }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '1.1rem' }}>
+                Search for a center by name using the search bar (top left).
               </Typography>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ textAlign: 'center', p: 2 }}>
-              <Warning sx={{ fontSize: 48, color: 'warning.main', mb: 1 }} />
-              <Typography variant="h4" fontWeight="bold" color="warning.main">
-                {safetyFlags.filter(f => f.flag_status === 'red' || f.flag_status === 'black').length}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.5)' }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '1.1rem' }}>
+                Set your location manually by clicking the map (if GPS fails).
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Active Warnings
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.5)' }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '1.1rem' }}>
+                Check the weather panel for current and forecasted conditions at your location.
               </Typography>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ textAlign: 'center', p: 2 }}>
-              <Visibility sx={{ fontSize: 48, color: 'info.main', mb: 1 }} />
-              <Typography variant="h4" fontWeight="bold" color="info.main">
-                {lifeguardCounts.reduce((sum, l) => sum + l.active_lifeguards, 0)}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.5)' }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5, flexShrink: 0 }} />
+              <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 500, fontSize: '1.1rem' }}>
+                Staff can log in using the button at the top right.
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Active Lifeguards
-              </Typography>
-            </Card>
-          </Grid>
-        </Grid>
-      </Box>
-
-      {/* Call to Action */}
-      <Box sx={{ textAlign: 'center', p: 4, bgcolor: 'background.paper' }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Stay Safe at the Beach
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 600, mx: 'auto' }}>
-          Use our interactive map to check current conditions, view safety zones, and stay informed about real-time alerts and weather conditions.
-        </Typography>
-        <Button
-          component={RouterLink}
-          to="/map"
-          variant="contained"
-          size="large"
-          startIcon={<Map />}
-          sx={{
-            px: 4,
-            py: 1.5,
-            fontSize: '1.1rem',
-            fontWeight: 600,
-            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
-            },
-          }}
-        >
-          Explore Full Interactive Map
-        </Button>
+            </Box>
+          </Box>
+        </Paper>
       </Box>
 
       {/* Emergency Alert Component */}
