@@ -251,7 +251,12 @@ const InterCenterSupport: React.FC = () => {
   }, [socket, queryClient]);
 
   const handleCreateRequest = () => {
-    createMutation.mutate(formData);
+    // Normalize escalation_id - convert empty string to null
+    const normalizedFormData = {
+      ...formData,
+      escalation_id: formData.escalation_id && formData.escalation_id.trim() !== '' ? formData.escalation_id : null
+    };
+    createMutation.mutate(normalizedFormData);
   };
 
   const handleViewRequest = (request: SupportRequest) => {
