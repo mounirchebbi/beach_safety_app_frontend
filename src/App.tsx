@@ -33,6 +33,7 @@ import LifeguardManagement from './components/admin/LifeguardManagement';
 import ShiftScheduling from './components/admin/ShiftScheduling';
 import SafetyManagement from './components/admin/SafetyManagement';
 import AdminIncidentReports from './components/admin/IncidentReports';
+import AdminEmergencyAlerts from './components/admin/AdminEmergencyAlerts';
 import EscalationManagement from './components/admin/EscalationManagement';
 import InterCenterSupport from './components/admin/InterCenterSupport';
 
@@ -40,6 +41,7 @@ import InterCenterSupport from './components/admin/InterCenterSupport';
 import SystemDashboard from './components/system-admin/SystemDashboard';
 import SystemCenterManagement from './components/system-admin/SystemCenterManagement';
 import SystemUserManagement from './components/system-admin/SystemUserManagement';
+import SystemFlagManagement from './components/system-admin/SystemFlagManagement';
 import SystemReports from './components/system-admin/SystemReports';
 
 // Create theme
@@ -182,6 +184,7 @@ const AppContent: React.FC = () => {
                 <Route path="/lifeguards" element={<LifeguardManagement />} />
                 <Route path="/shifts" element={<ShiftScheduling />} />
                 <Route path="/safety" element={<SafetyManagement />} />
+                <Route path="/alerts" element={<AdminEmergencyAlerts />} />
                 <Route path="/reports" element={<AdminIncidentReports />} />
                 <Route path="/escalations" element={<EscalationManagement />} />
                 <Route path="/inter-center-support" element={<InterCenterSupport />} />
@@ -199,6 +202,7 @@ const AppContent: React.FC = () => {
                 <Route path="/" element={<SystemDashboard />} />
                 <Route path="/centers" element={<SystemCenterManagement />} />
                 <Route path="/users" element={<SystemUserManagement />} />
+                <Route path="/flags" element={<SystemFlagManagement />} />
                 <Route path="/reports" element={<SystemReports />} />
               </Routes>
             </ProtectedRoute>
