@@ -53,7 +53,7 @@ const ShiftManagement: React.FC = () => {
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'info' });
   const [checkingIn, setCheckingIn] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const loadShifts = async () => {

@@ -6,13 +6,7 @@ import {
   CardContent,
   Button,
   Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
+  Grid,
   Alert,
   CircularProgress,
   IconButton,
@@ -26,7 +20,13 @@ import {
   Select,
   MenuItem,
   TextField,
-  Grid
+  Divider,
+  Paper,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@mui/material';
 import {
   Warning as EmergencyIcon,
@@ -37,10 +37,16 @@ import {
   Refresh as RefreshIcon,
   Visibility as ViewIcon,
   Assignment as AssignIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  LocationOn as LocationIcon,
+  AccessTime as TimeIcon,
+  Person as PersonIcon,
+  Description as DescriptionIcon,
+  Map as MapIcon
 } from '@mui/icons-material';
 import { apiService } from '../../services/api';
 import { EmergencyAlert } from '../../types';
+import BeachMap from '../map/BeachMap';
 
 const EmergencyAlerts: React.FC = () => {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
@@ -48,6 +54,7 @@ const EmergencyAlerts: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('');
 
   useEffect(() => {
@@ -79,6 +86,11 @@ const EmergencyAlerts: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update alert status');
     }
+  };
+
+  const handleAlertClick = (alert: EmergencyAlert) => {
+    setSelectedAlert(alert);
+    setMapDialogOpen(true);
   };
 
   const getSeverityColor = (severity: string) => {
@@ -113,6 +125,17 @@ const EmergencyAlerts: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const alertTime = new Date(dateString);
+    const diffInMinutes = Math.floor((now.getTime() - alertTime.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    return `${Math.floor(diffInMinutes / 1440)} days ago`;
   };
 
   if (loading) {
@@ -158,98 +181,225 @@ const EmergencyAlerts: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Type</TableCell>
-                <TableCell>Severity</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Reported By</TableCell>
-                <TableCell>Created</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {alerts.map((alert) => (
-                <TableRow key={alert.id} sx={{ 
-                  bgcolor: alert.status === 'active' ? 'error.light' : 'inherit',
-                  '&:hover': { bgcolor: 'action.hover' }
-                }}>
-                  <TableCell>
+        <Grid container spacing={2}>
+          {alerts.map((alert) => (
+            <Grid item xs={12} md={6} lg={4} key={alert.id}>
+              <Card 
+                sx={{ 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': { 
+                    transform: 'translateY(-2px)',
+                    boxShadow: 3
+                  },
+                  border: alert.status === 'active' ? '2px solid' : '1px solid',
+                  borderColor: alert.status === 'active' ? 'error.main' : 'divider'
+                }}
+                onClick={() => handleAlertClick(alert)}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {getAlertTypeIcon(alert.alert_type)}
-                      <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                      <Typography variant="h6" sx={{ textTransform: 'capitalize' }}>
                         {alert.alert_type}
                       </Typography>
                     </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={alert.severity}
-                      color={getSeverityColor(alert.severity) as any}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={alert.status}
-                      color={getStatusColor(alert.status) as any}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ maxWidth: 200 }}>
-                      {alert.description || 'No description provided'}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                      <Chip
+                        label={alert.severity}
+                        color={getSeverityColor(alert.severity) as any}
+                        size="small"
+                      />
+                      <Chip
+                        label={alert.status}
+                        color={getStatusColor(alert.status) as any}
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <TimeIcon fontSize="small" />
+                      {formatTimeAgo(alert.created_at)}
                     </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <PersonIcon fontSize="small" />
                       {alert.reported_by || 'Anonymous'}
                     </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {formatDate(alert.created_at)}
+                  </Box>
+
+                  {alert.description && (
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      {alert.description}
                     </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setSelectedAlert(alert);
-                            setStatusDialogOpen(true);
-                          }}
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      {alert.status === 'active' && (
-                        <Tooltip title="Update Status">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => {
-                              setSelectedAlert(alert);
-                              setNewStatus('responding');
-                              setStatusDialogOpen(true);
-                            }}
-                          >
-                            <AssignIcon />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                  )}
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<MapIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAlertClick(alert);
+                      }}
+                    >
+                      View on Map
+                    </Button>
+                    {alert.status === 'active' && (
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="primary"
+                        startIcon={<AssignIcon />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAlert(alert);
+                          setNewStatus('responding');
+                          setStatusDialogOpen(true);
+                        }}
+                      >
+                        Respond
+                      </Button>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
       )}
+
+      {/* Map Dialog */}
+      <Dialog 
+        open={mapDialogOpen} 
+        onClose={() => setMapDialogOpen(false)} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{
+          sx: { height: '80vh' }
+        }}
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              Alert Location
+            </Typography>
+            <IconButton onClick={() => setMapDialogOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {selectedAlert && (
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              {/* Alert Details Panel */}
+              <Paper sx={{ p: 2, mb: 2, mx: 2, mt: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      {getAlertTypeIcon(selectedAlert.alert_type)}
+                      <Typography variant="h6" sx={{ textTransform: 'capitalize' }}>
+                        {selectedAlert.alert_type} Alert
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                      <Chip
+                        label={selectedAlert.severity}
+                        color={getSeverityColor(selectedAlert.severity) as any}
+                        size="small"
+                      />
+                      <Chip
+                        label={selectedAlert.status}
+                        color={getStatusColor(selectedAlert.status) as any}
+                        size="small"
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <List dense>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <TimeIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Launched"
+                          secondary={formatDate(selectedAlert.created_at)}
+                        />
+                      </ListItem>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <PersonIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Reported By"
+                          secondary={selectedAlert.reported_by || 'Anonymous'}
+                        />
+                      </ListItem>
+                      {selectedAlert.description && (
+                        <ListItem sx={{ px: 0 }}>
+                          <ListItemIcon sx={{ minWidth: 32 }}>
+                            <DescriptionIcon fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Description"
+                            secondary={selectedAlert.description}
+                          />
+                        </ListItem>
+                      )}
+                    </List>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Map */}
+              <Box sx={{ flex: 1, p: 2 }}>
+                {selectedAlert.location?.coordinates ? (
+                  <BeachMap
+                    alerts={[{
+                      id: selectedAlert.id,
+                      center_id: selectedAlert.center_id,
+                      type: selectedAlert.alert_type as any,
+                      location: {
+                        lat: selectedAlert.location.coordinates[1],
+                        lng: selectedAlert.location.coordinates[0]
+                      },
+                      description: selectedAlert.description || '',
+                      status: selectedAlert.status as any,
+                      created_at: selectedAlert.created_at
+                    }]}
+                    center={[
+                      selectedAlert.location.coordinates[1],
+                      selectedAlert.location.coordinates[0]
+                    ]}
+                    zoom={16}
+                    showAlerts={true}
+                    showUserLocation={false}
+                    showSafetyZones={false}
+                  />
+                ) : (
+                  <Box 
+                    sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      height: '300px',
+                      bgcolor: 'grey.100',
+                      borderRadius: 1
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      No location data available for this alert
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Status Update Dialog */}
       <Dialog open={statusDialogOpen} onClose={() => setStatusDialogOpen(false)} maxWidth="sm" fullWidth>

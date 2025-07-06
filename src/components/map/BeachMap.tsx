@@ -81,6 +81,8 @@ interface BeachMapProps {
   showSafetyZones?: boolean;
   showAlerts?: boolean;
   view?: 'satellite' | 'street' | 'hybrid';
+  center?: [number, number];
+  zoom?: number;
 }
 
 // Component to handle map updates
@@ -88,7 +90,18 @@ const MapUpdater: React.FC<{ center: [number, number]; zoom: number }> = ({ cent
   const map = useMap();
   
   useEffect(() => {
-    map.setView(center, zoom);
+    if (map && center && zoom) {
+      // Add a small delay to ensure map is fully initialized
+      const timer = setTimeout(() => {
+        try {
+          map.setView(center, zoom);
+        } catch (error) {
+          console.warn('Map update failed:', error);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
   }, [center, zoom, map]);
   
   return null;
@@ -125,10 +138,13 @@ const BeachMap: React.FC<BeachMapProps> = ({
   showSafetyZones = true,
   showAlerts = true,
   view = 'street',
+  center,
+  zoom,
 }) => {
   const [mapCenter, setMapCenter] = useState<[number, number]>([25.7617, -80.1918]); // Miami Beach default
   const [mapZoom, setMapZoom] = useState(12);
   const [userLocationState, setUserLocationState] = useState<{ lat: number; lng: number } | null>(userLocation || null);
+  const [mapReady, setMapReady] = useState(false);
 
   // Get user location on component mount
   useEffect(() => {
@@ -260,13 +276,14 @@ const BeachMap: React.FC<BeachMapProps> = ({
   return (
     <Box sx={{ width: '100%', height: '600px', position: 'relative' }}>
       <MapContainer
-        center={mapCenter}
-        zoom={mapZoom}
+        center={center || mapCenter}
+        zoom={zoom || mapZoom}
         style={{ height: '100%', width: '100%' }}
         zoomControl={true}
         scrollWheelZoom={true}
+        whenReady={() => setMapReady(true)}
       >
-        <MapUpdater center={mapCenter} zoom={mapZoom} />
+        {center && zoom && mapReady && <MapUpdater center={center} zoom={zoom} />}
         
         {/* Base tile layer */}
         <TileLayer
