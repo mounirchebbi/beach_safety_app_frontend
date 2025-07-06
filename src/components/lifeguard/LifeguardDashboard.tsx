@@ -553,7 +553,7 @@ const LifeguardDashboard: React.FC = () => {
                     {stats.activeAlerts > 0 ? 'Respond Now' : 'View Alerts'}
                   </Button>
                   
-                  <Button
+                                    <Button
                     variant="outlined"
                     size="small"
                     startIcon={<RefreshIcon />}
@@ -571,56 +571,9 @@ const LifeguardDashboard: React.FC = () => {
                     {refreshing ? 'Updating...' : 'Refresh'}
                   </Button>
                   
-                  {/* Debug button for testing */}
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      console.log('Manual test: Current stats:', stats);
-                      console.log('Manual test: Socket connected:', socketConnected);
-                      console.log('Manual test: User center info:', user?.center_info);
-                      updateActiveAlertsCount();
-                    }}
-                    sx={{ 
-                      borderColor: 'rgba(255,255,255,0.3)',
-                      color: 'rgba(255,255,255,0.7)',
-                      fontSize: '0.7rem',
-                      '&:hover': { 
-                        borderColor: 'rgba(255,255,255,0.5)',
-                        bgcolor: 'rgba(255,255,255,0.05)'
-                      }
-                    }}
-                  >
-                    Debug
-                  </Button>
+
                   
-                  {/* Test WebSocket button */}
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      console.log('Testing WebSocket connection...');
-                      const socket = socketService.getSocket();
-                      if (socket) {
-                        console.log('Socket exists, connected:', socket.connected);
-                        // Manually emit a test event
-                        socket.emit('test_event', { message: 'Test from frontend' });
-                      } else {
-                        console.log('No socket available');
-                      }
-                    }}
-                    sx={{ 
-                      borderColor: 'rgba(255,255,255,0.3)',
-                      color: 'rgba(255,255,255,0.7)',
-                      fontSize: '0.7rem',
-                      '&:hover': { 
-                        borderColor: 'rgba(255,255,255,0.5)',
-                        bgcolor: 'rgba(255,255,255,0.05)'
-                      }
-                    }}
-                  >
-                    Test WS
-                  </Button>
+
                 </Stack>
               </Box>
             </CardContent>

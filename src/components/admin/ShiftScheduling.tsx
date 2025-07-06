@@ -35,7 +35,9 @@ import {
   FormControlLabel,
   FormGroup,
   Tabs,
-  Tab
+  Tab,
+  Switch,
+  FormControlLabel as MuiFormControlLabel
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -50,7 +52,8 @@ import {
   Warning as WarningIcon,
   CalendarViewWeek as WeeklyIcon,
   ViewList as ViewListIcon,
-  CalendarMonth as CalendarMonthIcon
+  CalendarMonth as CalendarMonthIcon,
+  LocationOn as LocationIcon
 } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -139,6 +142,11 @@ const ShiftScheduling: React.FC = () => {
   // View mode state
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
 
+  // Location check-in setting state
+  const [locationCheckInEnabled, setLocationCheckInEnabled] = useState(false);
+  const [locationCheckInLoading, setLocationCheckInLoading] = useState(false);
+  const [locationCheckInError, setLocationCheckInError] = useState<string | null>(null);
+
   // Load shifts and lifeguards
   const loadData = async () => {
     try {
@@ -157,8 +165,42 @@ const ShiftScheduling: React.FC = () => {
     }
   };
 
+  // Load location check-in setting
+  const loadLocationCheckInSetting = async () => {
+    if (!user?.center_info?.id) return;
+    
+    try {
+      setLocationCheckInLoading(true);
+      setLocationCheckInError(null);
+      const setting = await apiService.getCenterLocationCheckInSetting(user.center_info.id);
+      setLocationCheckInEnabled(setting.require_location_check_in);
+    } catch (err: any) {
+      setLocationCheckInError(err.response?.data?.message || 'Failed to load location check-in setting');
+    } finally {
+      setLocationCheckInLoading(false);
+    }
+  };
+
+  // Update location check-in setting
+  const handleLocationCheckInToggle = async (enabled: boolean) => {
+    if (!user?.center_info?.id) return;
+    
+    try {
+      setLocationCheckInLoading(true);
+      setLocationCheckInError(null);
+      await apiService.updateCenterLocationCheckInSetting(user.center_info.id, enabled);
+      setLocationCheckInEnabled(enabled);
+      setSuccess(`Location-based check-in ${enabled ? 'enabled' : 'disabled'} successfully`);
+    } catch (err: any) {
+      setLocationCheckInError(err.response?.data?.message || 'Failed to update location check-in setting');
+    } finally {
+      setLocationCheckInLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    loadLocationCheckInSetting();
   }, []);
 
   // Handle form input changes
@@ -553,24 +595,67 @@ const ShiftScheduling: React.FC = () => {
             </CardContent>
           </Card>
         ) : (
-          <ShiftCalendar
-            shifts={shifts}
-            onShiftClick={handleView}
-            onDateClick={(date) => {
-              // Pre-fill the create form with the selected date
-              const startTime = new Date(date);
-              startTime.setHours(9, 0, 0, 0); // Default to 9 AM
-              const endTime = new Date(date);
-              endTime.setHours(17, 0, 0, 0); // Default to 5 PM
-              
-              setFormData(prev => ({
-                ...prev,
-                start_time: startTime.toISOString(),
-                end_time: endTime.toISOString()
-              }));
-              setCreateDialogOpen(true);
-            }}
-          />
+          <Box>
+            {/* Location Check-in Setting */}
+            <Card sx={{ mb: 2 }}>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <LocationIcon color="primary" />
+                    <Box>
+                      <Typography variant="h6" gutterBottom>
+                        Location-Based Check-in
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        When enabled, lifeguards can only check in when within 10km of the center location
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    {locationCheckInLoading ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <MuiFormControlLabel
+                        control={
+                          <Switch
+                            checked={locationCheckInEnabled}
+                            onChange={(e) => handleLocationCheckInToggle(e.target.checked)}
+                            color="primary"
+                          />
+                        }
+                        label={locationCheckInEnabled ? 'Enabled' : 'Disabled'}
+                        labelPlacement="start"
+                      />
+                    )}
+                  </Box>
+                </Box>
+                {locationCheckInError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {locationCheckInError}
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            <ShiftCalendar
+              shifts={shifts}
+              onShiftClick={handleView}
+              onDateClick={(date) => {
+                // Pre-fill the create form with the selected date
+                const startTime = new Date(date);
+                startTime.setHours(9, 0, 0, 0); // Default to 9 AM
+                const endTime = new Date(date);
+                endTime.setHours(17, 0, 0, 0); // Default to 5 PM
+                
+                setFormData(prev => ({
+                  ...prev,
+                  start_time: startTime.toISOString(),
+                  end_time: endTime.toISOString()
+                }));
+                setCreateDialogOpen(true);
+              }}
+            />
+          </Box>
         )}
 
         {/* Create Dialog */}

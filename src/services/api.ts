@@ -782,7 +782,36 @@ class ApiService {
   }
 
   async resetUserPassword(id: string, newPassword: string): Promise<void> {
-    await this.api.post(`/api/v1/auth/users/${id}/reset-password`, { new_password: newPassword });
+    await this.api.put(`/api/v1/users/${id}/reset-password`, { new_password: newPassword });
+  }
+
+  // Center location check-in settings
+  async getCenterLocationCheckInSetting(centerId: string): Promise<{
+    id: string;
+    name: string;
+    require_location_check_in: boolean;
+  }> {
+    const response: AxiosResponse<ApiResponse<{
+      id: string;
+      name: string;
+      require_location_check_in: boolean;
+    }>> = await this.api.get(`/api/v1/centers/${centerId}/location-check-in`);
+    return response.data.data!;
+  }
+
+  async updateCenterLocationCheckInSetting(centerId: string, requireLocationCheckIn: boolean): Promise<{
+    id: string;
+    name: string;
+    require_location_check_in: boolean;
+  }> {
+    const response: AxiosResponse<ApiResponse<{
+      id: string;
+      name: string;
+      require_location_check_in: boolean;
+    }>> = await this.api.put(`/api/v1/centers/${centerId}/location-check-in`, {
+      require_location_check_in: requireLocationCheckIn
+    });
+    return response.data.data!;
   }
 }
 
