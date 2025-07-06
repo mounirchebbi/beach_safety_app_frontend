@@ -184,7 +184,13 @@ const NoSwimZoneManagement: React.FC<NoSwimZoneManagementProps> = ({ centerId })
       loadZones();
       setError(null);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save safety zone');
+      if (err.response?.status === 409 && err.response?.data?.details?.overlappingZones) {
+        const overlappingZones = err.response.data.details.overlappingZones;
+        const zoneNames = overlappingZones.map((zone: any) => `${zone.name} (${zone.zone_type})`).join(', ');
+        setError(`Safety zone overlaps with existing zones: ${zoneNames}. Please adjust the location or radius to avoid overlap.`);
+      } else {
+        setError(err.response?.data?.error || 'Failed to save safety zone');
+      }
     }
   };
 
@@ -439,6 +445,9 @@ const NoSwimZoneManagement: React.FC<NoSwimZoneManagementProps> = ({ centerId })
               <Typography variant="subtitle2" gutterBottom>
                 Click on the map to select zone location
               </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Existing zones are shown with dashed borders. Overlapping zones will be prevented.
+              </Typography>
               <Box sx={{ height: 400, border: '1px solid #ddd', borderRadius: 1 }}>
                 <MapContainer
                   center={mapCenter}
@@ -469,6 +478,31 @@ const NoSwimZoneManagement: React.FC<NoSwimZoneManagementProps> = ({ centerId })
                       }}
                     />
                   )}
+
+                  {/* Display existing zones for reference */}
+                  {zones.map((zone) => {
+                    const coordinates = zone.geometry.coordinates[0];
+                    const centerLat = coordinates.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coordinates.length;
+                    const centerLng = coordinates.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coordinates.length;
+                    const radius = calculateRadiusFromGeometry(zone.geometry);
+                    
+                    return (
+                      <Circle
+                        key={zone.id}
+                        center={[centerLat, centerLng]}
+                        radius={radius}
+                        pathOptions={{
+                          color: zone.zone_type === 'no_swim' ? '#f44336' : 
+                                 zone.zone_type === 'caution' ? '#ff9800' : '#4caf50',
+                          fillColor: zone.zone_type === 'no_swim' ? '#f44336' : 
+                                     zone.zone_type === 'caution' ? '#ff9800' : '#4caf50',
+                          fillOpacity: 0.1,
+                          weight: 1,
+                          dashArray: '5,5'
+                        }}
+                      />
+                    );
+                  })}
                 </MapContainer>
               </Box>
               

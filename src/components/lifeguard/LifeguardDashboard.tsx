@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -38,6 +38,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import WeatherWidget from '../weather/WeatherWidget';
 import apiService from '../../services/api';
+import socketService from '../../services/socket';
 
 interface CurrentShift {
   id: string;
@@ -65,6 +66,138 @@ const LifeguardDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [showAlertNotification, setShowAlertNotification] = useState(false);
+
+  // WebSocket connection and event listeners
+  useEffect(() => {
+    if (user?.center_info?.id) {
+      console.log('Setting up WebSocket connection for center:', user.center_info.id);
+      
+      try {
+        const socket = socketService.connect();
+        console.log('Socket service connected, socket object:', socket);
+        
+        // Join center room for real-time updates
+        socketService.joinCenter(user.center_info.id);
+        console.log('Joined center room:', user.center_info.id);
+        
+        // Listen for emergency alerts
+        socketService.onEmergencyAlert((data) => {
+          console.log('Emergency alert received:', data);
+          updateActiveAlertsCount();
+          setShowAlertNotification(true);
+          // Auto-hide notification after 5 seconds
+          setTimeout(() => setShowAlertNotification(false), 5000);
+        });
+
+        // Listen for alert status changes
+        socketService.onAlertStatusChange((data) => {
+          console.log('Alert status change received:', data);
+          updateActiveAlertsCount();
+        });
+
+        // Listen for alert acknowledgments
+        socketService.onAlertAcknowledged((data) => {
+          console.log('Alert acknowledged:', data);
+          updateActiveAlertsCount();
+        });
+
+        // Check socket connection status
+        if (socket.connected) {
+          console.log('Socket connected successfully');
+          setSocketConnected(true);
+        } else {
+          console.log('Socket not connected, waiting for connection...');
+          socket.on('connect', () => {
+            console.log('Socket connected after waiting');
+            setSocketConnected(true);
+          });
+        }
+
+        // Add connection event listeners for debugging
+        socket.on('connect', () => {
+          console.log('Socket connected event fired');
+          setSocketConnected(true);
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.log('Socket disconnected:', reason);
+          setSocketConnected(false);
+        });
+
+        socket.on('connect_error', (error) => {
+          console.error('Socket connection error:', error);
+          setSocketConnected(false);
+        });
+
+        // Cleanup function
+        return () => {
+          console.log('Cleaning up WebSocket connection');
+          socketService.offEmergencyAlert();
+          socketService.offAlertStatusChange();
+          socketService.offAlertAcknowledged();
+          socketService.disconnect();
+          setSocketConnected(false);
+        };
+      } catch (error) {
+        console.error('Error setting up WebSocket connection:', error);
+        setSocketConnected(false);
+      }
+    }
+  }, [user?.center_info?.id]);
+
+  // Update active alerts count
+  const updateActiveAlertsCount = useCallback(async () => {
+    if (user?.center_info?.id) {
+      try {
+        console.log('Updating active alerts count for center:', user.center_info.id);
+        console.log('User center info:', user.center_info);
+        
+        const alertsData = await apiService.getAlerts();
+        console.log('All alerts data received:', alertsData);
+        console.log('Number of alerts received:', alertsData.length);
+        
+        // Log each alert to see the structure
+        alertsData.forEach((alert: any, index: number) => {
+          console.log(`Alert ${index}:`, {
+            id: alert.id,
+            center_id: alert.center_id,
+            status: alert.status,
+            alert_type: alert.alert_type,
+            severity: alert.severity
+          });
+        });
+        
+        // The backend already filters alerts by center, so we don't need to filter again
+        // Just count active alerts from the returned data
+        const activeAlerts = alertsData.filter((alert: any) => alert.status === 'active').length;
+        console.log('Active alerts count:', activeAlerts);
+        
+        setStats(prev => ({
+          ...prev,
+          activeAlerts
+        }));
+        console.log('Updated active alerts count:', activeAlerts);
+      } catch (err) {
+        console.error('Failed to update active alerts count:', err);
+      }
+    } else {
+      console.log('No user center info available:', user);
+    }
+  }, [user?.center_info?.id]);
+
+  // Periodic refresh as fallback (every 30 seconds)
+  useEffect(() => {
+    if (user?.center_info?.id) {
+      const interval = setInterval(() => {
+        console.log('Periodic refresh of alerts count');
+        updateActiveAlertsCount();
+      }, 30000); // 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [user?.center_info?.id, updateActiveAlertsCount]);
 
   useEffect(() => {
     loadDashboardData();
@@ -88,15 +221,7 @@ const LifeguardDashboard: React.FC = () => {
       // Load dashboard stats
       if (user?.center_info?.id) {
         try {
-          const alertsData = await apiService.getAlerts();
-          const activeAlerts = alertsData.filter((alert: any) => 
-            alert.status === 'active' && alert.center_id === user.center_info!.id
-          ).length;
-          
-          setStats(prev => ({
-            ...prev,
-            activeAlerts
-          }));
+          await updateActiveAlertsCount();
         } catch (err) {
           console.log('Could not load alerts');
         }
@@ -185,15 +310,39 @@ const LifeguardDashboard: React.FC = () => {
               </Typography>
             </Box>
           </Box>
-          <Tooltip title="Refresh Dashboard">
-            <IconButton 
-              onClick={loadDashboardData}
-              disabled={refreshing}
-              sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* Connection Status Indicator */}
+            <Tooltip title={socketConnected ? 'Real-time updates connected' : 'Real-time updates disconnected'}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: socketConnected ? '#4caf50' : '#f44336',
+                    animation: socketConnected ? 'pulse 2s infinite' : 'none',
+                    '@keyframes pulse': {
+                      '0%': { opacity: 1 },
+                      '50%': { opacity: 0.5 },
+                      '100%': { opacity: 1 }
+                    }
+                  }}
+                />
+                <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                  {socketConnected ? 'Live' : 'Offline'}
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title="Refresh Dashboard">
+              <IconButton 
+                onClick={loadDashboardData}
+                disabled={refreshing}
+                sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
         
         {refreshing && <LinearProgress sx={{ bgcolor: 'rgba(255,255,255,0.3)', '& .MuiLinearProgress-bar': { bgcolor: 'white' } }} />}
@@ -202,6 +351,21 @@ const LifeguardDashboard: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
+        </Alert>
+      )}
+
+      {showAlertNotification && (
+        <Alert 
+          severity="error" 
+          sx={{ mb: 3 }} 
+          onClose={() => setShowAlertNotification(false)}
+          action={
+            <Button color="inherit" size="small" onClick={() => navigate('/lifeguard/alerts')}>
+              View Alerts
+            </Button>
+          }
+        >
+          New emergency alert received! Please respond immediately.
         </Alert>
       )}
 
@@ -314,8 +478,36 @@ const LifeguardDashboard: React.FC = () => {
           <Card elevation={2} sx={{ 
             height: '100%',
             background: stats.activeAlerts > 0 ? 'linear-gradient(135deg, #ff4444 0%, #ff6b6b 100%)' : 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
-            color: 'white'
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            {/* Real-time indicator */}
+            <Box sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5
+            }}>
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: socketConnected ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
+                animation: socketConnected ? 'pulse 2s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%': { opacity: 1 },
+                  '50%': { opacity: 0.5 },
+                  '100%': { opacity: 1 }
+                }
+              }} />
+              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem' }}>
+                {socketConnected ? 'Live' : 'Offline'}
+              </Typography>
+            </Box>
+
             <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                 <Badge badgeContent={stats.activeAlerts} color="error" max={99}>
@@ -346,19 +538,90 @@ const LifeguardDashboard: React.FC = () => {
                   {stats.activeAlerts === 1 ? 'Active Alert' : 'Active Alerts'}
                 </Typography>
                 
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={<WarningIcon />}
-                  onClick={() => navigate('/lifeguard/alerts')}
-                  sx={{ 
-                    bgcolor: 'white', 
-                    color: stats.activeAlerts > 0 ? 'error.main' : 'success.main',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
-                  }}
-                >
-                  {stats.activeAlerts > 0 ? 'Respond Now' : 'View Alerts'}
-                </Button>
+                <Stack spacing={1} sx={{ width: '100%' }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<WarningIcon />}
+                    onClick={() => navigate('/lifeguard/alerts')}
+                    sx={{ 
+                      bgcolor: 'white', 
+                      color: stats.activeAlerts > 0 ? 'error.main' : 'success.main',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
+                    }}
+                  >
+                    {stats.activeAlerts > 0 ? 'Respond Now' : 'View Alerts'}
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<RefreshIcon />}
+                    onClick={updateActiveAlertsCount}
+                    disabled={refreshing}
+                    sx={{ 
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      color: 'rgba(255,255,255,0.9)',
+                      '&:hover': { 
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255,255,255,0.1)'
+                      }
+                    }}
+                  >
+                    {refreshing ? 'Updating...' : 'Refresh'}
+                  </Button>
+                  
+                  {/* Debug button for testing */}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      console.log('Manual test: Current stats:', stats);
+                      console.log('Manual test: Socket connected:', socketConnected);
+                      console.log('Manual test: User center info:', user?.center_info);
+                      updateActiveAlertsCount();
+                    }}
+                    sx={{ 
+                      borderColor: 'rgba(255,255,255,0.3)',
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: '0.7rem',
+                      '&:hover': { 
+                        borderColor: 'rgba(255,255,255,0.5)',
+                        bgcolor: 'rgba(255,255,255,0.05)'
+                      }
+                    }}
+                  >
+                    Debug
+                  </Button>
+                  
+                  {/* Test WebSocket button */}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      console.log('Testing WebSocket connection...');
+                      const socket = socketService.getSocket();
+                      if (socket) {
+                        console.log('Socket exists, connected:', socket.connected);
+                        // Manually emit a test event
+                        socket.emit('test_event', { message: 'Test from frontend' });
+                      } else {
+                        console.log('No socket available');
+                      }
+                    }}
+                    sx={{ 
+                      borderColor: 'rgba(255,255,255,0.3)',
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: '0.7rem',
+                      '&:hover': { 
+                        borderColor: 'rgba(255,255,255,0.5)',
+                        bgcolor: 'rgba(255,255,255,0.05)'
+                      }
+                    }}
+                  >
+                    Test WS
+                  </Button>
+                </Stack>
               </Box>
             </CardContent>
           </Card>

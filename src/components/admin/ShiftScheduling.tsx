@@ -48,7 +48,9 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   Warning as WarningIcon,
-  CalendarViewWeek as WeeklyIcon
+  CalendarViewWeek as WeeklyIcon,
+  ViewList as ViewListIcon,
+  CalendarMonth as CalendarMonthIcon
 } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -57,6 +59,7 @@ import { format, parseISO, isAfter, isBefore, addHours } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import { ShiftFormData, WeeklyScheduleFormData } from '../../types';
+import ShiftCalendar from './ShiftCalendar';
 
 // Interface matching the actual API response structure
 interface ShiftWithLifeguard {
@@ -132,6 +135,9 @@ const ShiftScheduling: React.FC = () => {
   // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
 
   // Load shifts and lifeguards
   const loadData = async () => {
@@ -365,14 +371,34 @@ const ShiftScheduling: React.FC = () => {
           <Typography variant="h4">
             Shift Scheduling
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-            sx={{ borderRadius: 2 }}
-          >
-            Schedule Shift
-          </Button>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Button
+                variant={viewMode === 'list' ? 'contained' : 'outlined'}
+                startIcon={<ViewListIcon />}
+                onClick={() => setViewMode('list')}
+                size="small"
+              >
+                List View
+              </Button>
+              <Button
+                variant={viewMode === 'calendar' ? 'contained' : 'outlined'}
+                startIcon={<CalendarMonthIcon />}
+                onClick={() => setViewMode('calendar')}
+                size="small"
+              >
+                Calendar View
+              </Button>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleCreate}
+              sx={{ borderRadius: 2 }}
+            >
+              Schedule Shift
+            </Button>
+          </Box>
         </Box>
 
         {error && (
@@ -387,144 +413,165 @@ const ShiftScheduling: React.FC = () => {
           </Alert>
         )}
 
-        <Card>
-          <CardContent>
-            <TableContainer component={Paper} elevation={0}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Lifeguard</TableCell>
-                    <TableCell>Schedule</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Check-in/out</TableCell>
-                    <TableCell>Center</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {shifts
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((shift) => (
-                    <TableRow key={shift.id} hover>
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={2}>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            {shift.first_name.charAt(0)}
-                          </Avatar>
-                          <Box>
-                            <Typography variant="subtitle2" fontWeight="bold">
-                              {shift.first_name} {shift.last_name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {shift.email}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                            <TimeIcon fontSize="small" color="action" />
-                            <Typography variant="body2">
-                              {format(parseISO(shift.start_time), 'MMM dd, yyyy HH:mm')} - {format(parseISO(shift.end_time), 'HH:mm')}
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" color="text.secondary">
-                            Duration: {Math.round((parseISO(shift.end_time).getTime() - parseISO(shift.start_time).getTime()) / (1000 * 60 * 60))}h
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          icon={getStatusIcon(shift.status)}
-                          label={shift.status.charAt(0).toUpperCase() + shift.status.slice(1)}
-                          color={getStatusColor(shift.status) as any}
-                          size="small"
-                          variant={isShiftOverdue(shift.end_time, shift.status) ? "outlined" : "filled"}
-                        />
-                        {isShiftOverdue(shift.end_time, shift.status) && (
-                          <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5 }}>
-                            Overdue
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          {shift.check_in_time && (
-                            <Typography variant="body2" color="success.main">
-                              ✓ In: {format(parseISO(shift.check_in_time), 'HH:mm')}
-                            </Typography>
-                          )}
-                          {shift.check_out_time && (
-                            <Typography variant="body2" color="info.main">
-                              ✓ Out: {format(parseISO(shift.check_out_time), 'HH:mm')}
-                            </Typography>
-                          )}
-                          {!shift.check_in_time && shift.status === 'scheduled' && (
-                            <Typography variant="body2" color="text.secondary">
-                              Not checked in
-                            </Typography>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {shift.center_name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Box display="flex" gap={1} justifyContent="center">
-                          <Tooltip title="View Details">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleView(shift)}
-                              color="info"
-                            >
-                              <ViewIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Edit">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleEdit(shift)}
-                              color="primary"
-                              disabled={shift.status === 'active' || shift.status === 'completed'}
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDelete(shift)}
-                              color="error"
-                              disabled={shift.status === 'active'}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
+        {viewMode === 'list' ? (
+          <Card>
+            <CardContent>
+              <TableContainer component={Paper} elevation={0}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Lifeguard</TableCell>
+                      <TableCell>Schedule</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Check-in/out</TableCell>
+                      <TableCell>Center</TableCell>
+                      <TableCell align="center">Actions</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            
-            <TablePagination
-              component="div"
-              count={shifts.length}
-              page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(event) => {
-                setRowsPerPage(parseInt(event.target.value, 10));
-                setPage(0);
-              }}
-              rowsPerPageOptions={[5, 10, 25]}
-            />
-          </CardContent>
-        </Card>
+                  </TableHead>
+                  <TableBody>
+                    {shifts
+                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                      .map((shift) => (
+                      <TableRow key={shift.id} hover>
+                        <TableCell>
+                          <Box display="flex" alignItems="center" gap={2}>
+                            <Avatar sx={{ bgcolor: 'primary.main' }}>
+                              {shift.first_name.charAt(0)}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="subtitle2" fontWeight="bold">
+                                {shift.first_name} {shift.last_name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {shift.email}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                              <TimeIcon fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                {format(parseISO(shift.start_time), 'MMM dd, yyyy HH:mm')} - {format(parseISO(shift.end_time), 'HH:mm')}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              Duration: {Math.round((parseISO(shift.end_time).getTime() - parseISO(shift.start_time).getTime()) / (1000 * 60 * 60))}h
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            icon={getStatusIcon(shift.status)}
+                            label={shift.status.charAt(0).toUpperCase() + shift.status.slice(1)}
+                            color={getStatusColor(shift.status) as any}
+                            size="small"
+                            variant={isShiftOverdue(shift.end_time, shift.status) ? "outlined" : "filled"}
+                          />
+                          {isShiftOverdue(shift.end_time, shift.status) && (
+                            <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5 }}>
+                              Overdue
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            {shift.check_in_time && (
+                              <Typography variant="body2" color="success.main">
+                                ✓ In: {format(parseISO(shift.check_in_time), 'HH:mm')}
+                              </Typography>
+                            )}
+                            {shift.check_out_time && (
+                              <Typography variant="body2" color="info.main">
+                                ✓ Out: {format(parseISO(shift.check_out_time), 'HH:mm')}
+                              </Typography>
+                            )}
+                            {!shift.check_in_time && shift.status === 'scheduled' && (
+                              <Typography variant="body2" color="text.secondary">
+                                Not checked in
+                              </Typography>
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {shift.center_name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box display="flex" gap={1} justifyContent="center">
+                            <Tooltip title="View Details">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleView(shift)}
+                                color="info"
+                              >
+                                <ViewIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Edit">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleEdit(shift)}
+                                color="primary"
+                                disabled={shift.status === 'active' || shift.status === 'completed'}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDelete(shift)}
+                                color="error"
+                                disabled={shift.status === 'active'}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              
+              <TablePagination
+                component="div"
+                count={shifts.length}
+                page={page}
+                onPageChange={(_, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(event) => {
+                  setRowsPerPage(parseInt(event.target.value, 10));
+                  setPage(0);
+                }}
+                rowsPerPageOptions={[5, 10, 25]}
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          <ShiftCalendar
+            shifts={shifts}
+            onShiftClick={handleView}
+            onDateClick={(date) => {
+              // Pre-fill the create form with the selected date
+              const startTime = new Date(date);
+              startTime.setHours(9, 0, 0, 0); // Default to 9 AM
+              const endTime = new Date(date);
+              endTime.setHours(17, 0, 0, 0); // Default to 5 PM
+              
+              setFormData(prev => ({
+                ...prev,
+                start_time: startTime.toISOString(),
+                end_time: endTime.toISOString()
+              }));
+              setCreateDialogOpen(true);
+            }}
+          />
+        )}
 
         {/* Create Dialog */}
         <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
