@@ -31,7 +31,16 @@ import {
   Fab,
   Pagination,
   CircularProgress,
-  FormHelperText
+  FormHelperText,
+  Badge,
+  Avatar,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -43,258 +52,127 @@ import {
   Cancel as CancelIcon,
   Schedule as ScheduleIcon,
   Info as InfoIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Save as SaveIcon,
+  ExpandMore as ExpandMoreIcon,
+  AccessTime as AccessTimeIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  WarningAmber as WarningAmberIcon,
+  Block as BlockIcon
 } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { format, parseISO, isAfter, addHours } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
-import apiService from '../../services/api';
-import { SafetyFlag } from '../../types';
+import { apiService } from '../../services/api';
+
+interface SafetyFlag {
+  id: string;
+  flag_status: 'green' | 'yellow' | 'red' | 'black';
+  reason: string;
+  set_at: string;
+  expires_at?: string;
+  created_at: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+}
 
 interface SafetyFlagFormData {
   flag_status: 'green' | 'yellow' | 'red' | 'black';
   reason: string;
-  expires_at?: string;
-}
-
-interface FormErrors {
-  flag_status?: string;
-  reason?: string;
-  expires_at?: string;
+  expires_at?: Date;
 }
 
 const SafetyManagement: React.FC = () => {
   const { user } = useAuth();
-  const [currentFlag, setCurrentFlag] = useState<SafetyFlag | null>(null);
-  const [flagHistory, setFlagHistory] = useState<SafetyFlag[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [openDialog, setOpenDialog] = useState(false);
+  const centerId = user?.center_id;
+  
+  const [safetyFlags, setSafetyFlags] = useState<SafetyFlag[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingFlag, setEditingFlag] = useState<SafetyFlag | null>(null);
   const [formData, setFormData] = useState<SafetyFlagFormData>({
     flag_status: 'green',
     reason: '',
     expires_at: undefined
   });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info';
-  }>({ open: false, message: '', severity: 'info' });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [managementMode, setManagementMode] = useState<'automatic' | 'manual' | null>(null);
-  const [autoUpdateLoading, setAutoUpdateLoading] = useState(false);
-  const [flagExpiration, setFlagExpiration] = useState<string | null>(null);
-  const [flagSetBy, setFlagSetBy] = useState<string | null>(null);
-
-  const centerId = user?.center_info?.id;
 
   useEffect(() => {
     if (centerId) {
-      loadCurrentFlag();
-      loadFlagHistory();
-      loadManagementMode();
+      loadSafetyFlags();
     }
-  }, [centerId, currentPage]);
+  }, [centerId, page]);
 
-  const loadCurrentFlag = async () => {
+  const loadSafetyFlags = async () => {
     try {
       setLoading(true);
-      const flag = await apiService.getCurrentSafetyFlag(centerId!);
-      setCurrentFlag(flag);
+      const response = await apiService.getSafetyFlags(centerId!);
+      setSafetyFlags(response.flags || []);
+      setTotalPages(response.pagination?.totalPages || 1);
     } catch (error) {
-      console.error('Error loading current flag:', error);
-      setCurrentFlag(null);
+      console.error('Error loading safety flags:', error);
+      setError('Failed to load safety flags');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadFlagHistory = async () => {
-    try {
-      setHistoryLoading(true);
-      const response = await apiService.getSafetyFlagHistory(centerId!, currentPage, 10);
-      setFlagHistory(response.flags);
-      setTotalPages(response.pagination.totalPages);
-      setTotalCount(response.pagination.totalCount);
-    } catch (error) {
-      console.error('Error loading flag history:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to load flag history',
-        severity: 'error'
-      });
-    } finally {
-      setHistoryLoading(false);
+  const handleEdit = (flag: SafetyFlag) => {
+    setEditingFlag(flag);
+    setFormData({
+      flag_status: flag.flag_status,
+      reason: flag.reason,
+      expires_at: flag.expires_at ? new Date(flag.expires_at) : undefined
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (flagId: string) => {
+    if (window.confirm('Are you sure you want to delete this safety flag?')) {
+      try {
+        await apiService.deleteSafetyFlag(flagId);
+        setSuccess('Safety flag deleted successfully');
+        loadSafetyFlags();
+      } catch (error) {
+        console.error('Error deleting safety flag:', error);
+        setError('Failed to delete safety flag');
+      }
     }
   };
 
-  const loadManagementMode = async () => {
+  const handleSave = async () => {
     try {
-      const mode = await apiService.getFlagManagementMode(centerId!);
-      setManagementMode(mode.mode);
-      
-      // Set additional flag information
-      if (mode.current_flag) {
-        setFlagExpiration(mode.current_flag.expires_at);
-        setFlagSetBy(mode.current_flag.set_by?.first_name + ' ' + mode.current_flag.set_by?.last_name || 'Unknown');
+      if (editingFlag) {
+        await apiService.updateSafetyFlag(editingFlag.id, formData);
+        setSuccess('Safety flag updated successfully');
       } else {
-        setFlagExpiration(null);
-        setFlagSetBy(null);
+        await apiService.setSafetyFlag(centerId!, formData);
+        setSuccess('Safety flag created successfully');
       }
+      setDialogOpen(false);
+      loadSafetyFlags();
     } catch (error) {
-      console.error('Error loading management mode:', error);
-      setManagementMode(null);
-      setFlagExpiration(null);
-      setFlagSetBy(null);
+      console.error('Error saving safety flag:', error);
+      setError('Failed to save safety flag');
     }
   };
 
   const handleAutoUpdate = async () => {
     try {
-      setAutoUpdateLoading(true);
-      const result = await apiService.triggerAutomaticFlagUpdate(centerId!);
-      
-      if (result.data.updated) {
-        setSnackbar({
-          open: true,
-          message: `Flag updated automatically: ${result.data.old_flag} → ${result.data.new_flag}`,
-          severity: 'success'
-        });
-        // Reload data
-        await loadCurrentFlag();
-        await loadFlagHistory();
-        await loadManagementMode();
-      } else {
-        setSnackbar({
-          open: true,
-          message: result.message || 'No update needed - current conditions are appropriate',
-          severity: 'info'
-        });
-      }
+      await apiService.triggerAutoUpdate(centerId!);
+      setSuccess('Auto-update triggered successfully');
+      loadSafetyFlags();
     } catch (error) {
-      console.error('Error triggering automatic update:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to trigger automatic update',
-        severity: 'error'
-      });
-    } finally {
-      setAutoUpdateLoading(false);
+      console.error('Error triggering auto-update:', error);
+      setError('Failed to trigger auto-update');
     }
   };
 
-  const handleOpenDialog = (flag?: SafetyFlag) => {
-    if (flag) {
-      setEditingFlag(flag);
-      setFormData({
-        flag_status: flag.flag_status,
-        reason: flag.reason || '',
-        expires_at: flag.expires_at || undefined
-      });
-    } else {
-      setEditingFlag(null);
-      setFormData({
-        flag_status: 'green',
-        reason: '',
-        expires_at: undefined
-      });
-    }
-    setErrors({});
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setEditingFlag(null);
-    setFormData({
-      flag_status: 'green',
-      reason: '',
-      expires_at: undefined
-    });
-    setErrors({});
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.flag_status) {
-      newErrors.flag_status = 'Flag status is required';
-    }
-
-    if (!formData.reason.trim()) {
-      newErrors.reason = 'Reason is required';
-    }
-
-    if (formData.expires_at && isAfter(parseISO(formData.expires_at), addHours(new Date(), 24))) {
-      newErrors.expires_at = 'Expiry time cannot be more than 24 hours in the future';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    try {
-      if (editingFlag) {
-        await apiService.updateSafetyFlag(editingFlag.id, formData);
-        setSnackbar({
-          open: true,
-          message: 'Safety flag updated successfully',
-          severity: 'success'
-        });
-      } else {
-        await apiService.setSafetyFlag(centerId!, formData);
-        setSnackbar({
-          open: true,
-          message: 'Safety flag set successfully',
-          severity: 'success'
-        });
-      }
-
-      handleCloseDialog();
-      loadCurrentFlag();
-      loadFlagHistory();
-    } catch (error) {
-      console.error('Error saving safety flag:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to save safety flag',
-        severity: 'error'
-      });
-    }
-  };
-
-  const handleDelete = async (flagId: string) => {
-    if (!window.confirm('Are you sure you want to delete this safety flag?')) return;
-
-    try {
-      await apiService.deleteSafetyFlag(flagId);
-      setSnackbar({
-        open: true,
-        message: 'Safety flag deleted successfully',
-        severity: 'success'
-      });
-      loadCurrentFlag();
-      loadFlagHistory();
-    } catch (error) {
-      console.error('Error deleting safety flag:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to delete safety flag',
-        severity: 'error'
-      });
-    }
-  };
-
-  const getFlagStatusColor = (status: string) => {
+  const getFlagColor = (status: string) => {
     switch (status) {
       case 'green': return 'success';
       case 'yellow': return 'warning';
@@ -304,419 +182,378 @@ const SafetyManagement: React.FC = () => {
     }
   };
 
-  const getFlagStatusIcon = (status: string) => {
+  const getFlagIcon = (status: string) => {
     switch (status) {
-      case 'green': return <CheckCircleIcon />;
-      case 'yellow': return <WarningIcon />;
-      case 'red': return <WarningIcon />;
-      case 'black': return <CancelIcon />;
+      case 'green': return <CheckCircleOutlineIcon />;
+      case 'yellow': return <WarningAmberIcon />;
+      case 'red': return <ErrorOutlineIcon />;
+      case 'black': return <BlockIcon />;
       default: return <FlagIcon />;
-    }
-  };
-
-  const getFlagStatusDescription = (status: string) => {
-    switch (status) {
-      case 'green': return 'Swimming allowed - Low hazard';
-      case 'yellow': return 'Medium risk - Caution advised';
-      case 'red': return 'High risk - Swimming not recommended';
-      case 'black': return 'Swimming prohibited - Dangerous conditions';
-      default: return 'Unknown status';
     }
   };
 
   const isFlagExpired = (flag: SafetyFlag) => {
     if (!flag.expires_at) return false;
-    return isAfter(new Date(), parseISO(flag.expires_at));
+    return new Date(flag.expires_at) <= new Date();
+  };
+
+  const getFlagConditions = (status: string) => {
+    switch (status) {
+      case 'green':
+        return 'Safe conditions - Normal swimming allowed';
+      case 'yellow':
+        return 'Caution advised - Moderate hazards present';
+      case 'red':
+        return 'Dangerous conditions - Swimming prohibited';
+      case 'black':
+        return 'Beach closed - Extreme hazards present';
+      default:
+        return 'Unknown conditions';
+    }
+  };
+
+  const getExpirationStatus = (flag: SafetyFlag) => {
+    if (!flag.expires_at) return { status: 'permanent', text: 'No expiration', color: 'success' };
+    
+    const now = new Date();
+    const expiresAt = new Date(flag.expires_at);
+    const timeDiff = expiresAt.getTime() - now.getTime();
+    const hoursLeft = Math.floor(timeDiff / (1000 * 60 * 60));
+    
+    if (timeDiff <= 0) {
+      return { status: 'expired', text: 'Expired', color: 'error' };
+    } else if (hoursLeft <= 1) {
+      return { status: 'expiring-soon', text: `Expires in ${hoursLeft} hour(s)`, color: 'warning' };
+    } else {
+      return { status: 'active', text: `Expires in ${hoursLeft} hour(s)`, color: 'success' };
+    }
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box sx={{ p: 3 }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
-              Safety Flag Management
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Manage beach safety conditions and flag status for your center
-            </Typography>
-            {managementMode && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Management Mode:
-                </Typography>
-                <Chip
-                  label={managementMode === 'automatic' ? 'Automatic' : 'Manual'}
-                  color={managementMode === 'automatic' ? 'success' : 'warning'}
-                  size="small"
-                  variant="outlined"
-                />
-                {managementMode === 'automatic' && (
-                  <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                    (Flags are set automatically based on weather conditions)
-                  </Typography>
-                )}
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Safety Flag Management
+      </Typography>
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
+
+      {/* Flag Conditions Guide */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Safety Flag Conditions Guide
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Chip icon={<CheckCircleOutlineIcon />} label="GREEN" color="success" size="small" />
               </Box>
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={handleAutoUpdate}
-              disabled={autoUpdateLoading}
-              sx={{ px: 3 }}
-            >
-              {autoUpdateLoading ? 'Updating...' : 'Auto Update'}
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-              sx={{ px: 3 }}
-            >
-              Set New Flag
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Current Flag Status */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Current Safety Flag Status
-            </Typography>
-            {loading ? (
-              <CircularProgress size={20} />
-            ) : currentFlag ? (
-              <Box>
-                <Box display="flex" alignItems="center" mb={2}>
-                  <Box
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      mr: 2,
-                      backgroundColor: getFlagStatusColor(currentFlag.flag_status)
-                    }}
-                  >
-                    {currentFlag.flag_status.toUpperCase()}
-                  </Box>
-                  <Box>
-                    <Typography variant="h6" color={getFlagStatusColor(currentFlag.flag_status)}>
-                      {currentFlag.flag_status.toUpperCase()} FLAG
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Set on {new Date(currentFlag.set_at).toLocaleString()}
-                    </Typography>
-                  </Box>
-                </Box>
-                
-                {/* Flag Management Details */}
-                <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Flag Management Details
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Management Mode:
-                      </Typography>
-                      <Typography variant="body1" fontWeight="medium">
-                        {managementMode === 'automatic' ? '🔄 Automatic' : '👤 Manual'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Set By:
-                      </Typography>
-                      <Typography variant="body1" fontWeight="medium">
-                        {flagSetBy || 'Unknown'}
-                      </Typography>
-                    </Grid>
-                    {flagExpiration && (
-                      <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary">
-                          Expires:
-                        </Typography>
-                        <Typography 
-                          variant="body1" 
-                          fontWeight="medium"
-                          color={new Date(flagExpiration) <= new Date() ? 'error.main' : 'text.primary'}
-                        >
-                          {new Date(flagExpiration).toLocaleString()}
-                          {new Date(flagExpiration) <= new Date() && ' (EXPIRED)'}
-                        </Typography>
-                      </Grid>
-                    )}
-                  </Grid>
-                </Box>
-
-                <Typography variant="body1" sx={{ mb: 2 }}>
-                  <strong>Reason:</strong> {currentFlag.reason}
-                </Typography>
-              </Box>
-            ) : (
-              <Typography color="text.secondary">
-                No safety flag currently set for this center.
-              </Typography>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Automatic Flag Management */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Automatic Flag Management
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              The system automatically sets safety flags based on weather conditions. Manual flags override automatic ones until they expire.
-            </Typography>
-            
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, border: '1px solid', borderColor: 'info.200' }}>
-              <Typography variant="subtitle2" color="info.main" gutterBottom>
-                Current Status
-              </Typography>
               <Typography variant="body2" color="text.secondary">
-                Mode: <strong>{managementMode === 'automatic' ? 'Automatic' : 'Manual Override'}</strong>
+                Safe conditions - Normal swimming allowed
               </Typography>
-              {managementMode === 'manual' && flagExpiration && (
-                <Typography variant="body2" color="text.secondary">
-                  Manual override expires: <strong>{new Date(flagExpiration).toLocaleString()}</strong>
-                </Typography>
-              )}
-            </Box>
-
-            <Button
-              variant="contained"
-              startIcon={<RefreshIcon />}
-              onClick={handleAutoUpdate}
-              disabled={autoUpdateLoading}
-              sx={{ mr: 2 }}
-            >
-              {autoUpdateLoading ? 'Updating...' : 'Trigger Auto Update'}
-            </Button>
-            
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-              This will check current weather conditions and update the flag automatically if needed.
-            </Typography>
-          </CardContent>
-        </Card>
-
-        {/* Flag History */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Flag History
-            </Typography>
-
-            {historyLoading ? (
-              <Box display="flex" justifyContent="center" p={3}>
-                <CircularProgress />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Chip icon={<WarningAmberIcon />} label="YELLOW" color="warning" size="small" />
               </Box>
-            ) : (
-              <>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Reason</TableCell>
-                        <TableCell>Set By</TableCell>
-                        <TableCell>Set At</TableCell>
-                        <TableCell>Expires At</TableCell>
-                        <TableCell align="center">Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {flagHistory.map((flag) => (
-                        <TableRow key={flag.id} hover>
+              <Typography variant="body2" color="text.secondary">
+                Caution advised - Moderate hazards present
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Chip icon={<ErrorOutlineIcon />} label="RED" color="error" size="small" />
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Dangerous conditions - Swimming prohibited
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Chip icon={<BlockIcon />} label="BLACK" color="default" size="small" />
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Beach closed - Extreme hazards present
+              </Typography>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Current Safety Flags
+            </Typography>
+            <Box>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={loadSafetyFlags}
+                disabled={loading}
+                sx={{ mr: 1 }}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  setEditingFlag(null);
+                  setFormData({ flag_status: 'green', reason: '', expires_at: undefined });
+                  setDialogOpen(true);
+                }}
+              >
+                Add Flag
+              </Button>
+            </Box>
+          </Box>
+
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <>
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Reason & Conditions</TableCell>
+                      <TableCell>Set By</TableCell>
+                      <TableCell>Set At</TableCell>
+                      <TableCell>Expiration Status</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {safetyFlags.map((flag) => {
+                      const isExpired = isFlagExpired(flag);
+                      const expirationStatus = getExpirationStatus(flag);
+                      
+                      return (
+                        <TableRow 
+                          key={flag.id}
+                          sx={{
+                            opacity: isExpired ? 0.6 : 1,
+                            backgroundColor: isExpired ? 'action.hover' : 'inherit',
+                            '&:hover': {
+                              backgroundColor: isExpired ? 'action.hover' : 'action.hover'
+                            }
+                          }}
+                        >
                           <TableCell>
-                            <Chip
-                              icon={getFlagStatusIcon(flag.flag_status)}
-                              label={flag.flag_status.toUpperCase()}
-                              color={getFlagStatusColor(flag.flag_status) as any}
-                              size="small"
-                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Chip
+                                icon={getFlagIcon(flag.flag_status)}
+                                label={flag.flag_status.toUpperCase()}
+                                color={getFlagColor(flag.flag_status)}
+                                size="small"
+                                variant={isExpired ? "outlined" : "filled"}
+                              />
+                              {isExpired && (
+                                <Chip
+                                  label="EXPIRED"
+                                  color="error"
+                                  size="small"
+                                  variant="filled"
+                                />
+                              )}
+                            </Box>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                              {flag.reason || 'No reason provided'}
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                                {flag.reason}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {getFlagConditions(flag.flag_status)}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>
+                                {flag.first_name ? flag.first_name[0] : 'U'}
+                              </Avatar>
+                              <Typography variant="body2">
+                                {flag.first_name && flag.last_name 
+                                  ? `${flag.first_name} ${flag.last_name}`
+                                  : flag.email || 'Unknown'
+                                }
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {new Date(flag.set_at).toLocaleString()}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            {typeof flag.set_by === 'object' ? `${flag.set_by.first_name} ${flag.set_by.last_name}` : flag.set_by}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Chip
+                                icon={<AccessTimeIcon />}
+                                label={expirationStatus.text}
+                                color={expirationStatus.color as any}
+                                size="small"
+                                variant={isExpired ? "filled" : "outlined"}
+                              />
+                            </Box>
                           </TableCell>
                           <TableCell>
-                            {format(parseISO(flag.set_at), 'MMM dd, yyyy HH:mm')}
-                          </TableCell>
-                          <TableCell>
-                            {flag.expires_at ? (
-                              <Typography
-                                variant="body2"
-                                color={isFlagExpired(flag) ? 'error' : 'text.primary'}
-                              >
-                                {format(parseISO(flag.expires_at), 'MMM dd, yyyy HH:mm')}
-                              </Typography>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                No expiry
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell align="center">
-                            <Tooltip title="Edit flag">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleOpenDialog(flag)}
-                                color="primary"
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete flag">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDelete(flag.id)}
-                                color="error"
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              <Tooltip title="Edit flag">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleEdit(flag)}
+                                  color="primary"
+                                  disabled={isExpired}
+                                >
+                                  <EditIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete flag">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDelete(flag.id)}
+                                  color="error"
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
                           </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-                {totalPages > 1 && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={(_, page) => setCurrentPage(page)}
-                      color="primary"
-                    />
+              {totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <Pagination
+                    count={totalPages}
+                    page={page}
+                    onChange={(event, value) => setPage(value)}
+                    color="primary"
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {editingFlag ? 'Edit Safety Flag' : 'Add Safety Flag'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Flag Status</InputLabel>
+              <Select
+                value={formData.flag_status}
+                onChange={(e) => setFormData({ ...formData, flag_status: e.target.value as any })}
+                label="Flag Status"
+              >
+                <MenuItem value="green">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CheckCircleOutlineIcon color="success" />
+                    Green - Safe (Normal swimming allowed)
                   </Box>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                </MenuItem>
+                <MenuItem value="yellow">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <WarningAmberIcon color="warning" />
+                    Yellow - Caution (Moderate hazards present)
+                  </Box>
+                </MenuItem>
+                <MenuItem value="red">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ErrorOutlineIcon color="error" />
+                    Red - Dangerous (Swimming prohibited)
+                  </Box>
+                </MenuItem>
+                <MenuItem value="black">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <BlockIcon />
+                    Black - Closed (Extreme hazards present)
+                  </Box>
+                </MenuItem>
+              </Select>
+              <FormHelperText>
+                {getFlagConditions(formData.flag_status)}
+              </FormHelperText>
+            </FormControl>
+            
+            <TextField
+              fullWidth
+              label="Reason"
+              value={formData.reason}
+              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              multiline
+              rows={3}
+              sx={{ mb: 2 }}
+              helperText="Provide a detailed reason for this safety flag"
+            />
+            
+            <DateTimePicker
+              label="Expiration Date & Time (Optional)"
+              value={formData.expires_at}
+              onChange={(newValue) => setFormData({ ...formData, expires_at: newValue || undefined })}
+              minDateTime={new Date()}
+              maxDateTime={new Date(Date.now() + 24* 60 *60*1000)} // 24 hours from now
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  sx: { mb: 2 },
+                  helperText: "Maximum duration is 24 hours. Leave empty for default 2-hour expiration."
+                }
+              }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" disabled={!formData.reason.trim()}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        {/* Safety Flag Dialog */}
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <DialogTitle>
-            {editingFlag ? 'Edit Safety Flag' : 'Set New Safety Flag'}
-          </DialogTitle>
-          <DialogContent>
-            <Box sx={{ pt: 1 }}>
-              <FormControl fullWidth sx={{ mb: 3 }}>
-                <InputLabel>Flag Status</InputLabel>
-                <Select
-                  value={formData.flag_status}
-                  onChange={(e) => setFormData({ ...formData, flag_status: e.target.value as any })}
-                  error={!!errors.flag_status}
-                >
-                  <MenuItem value="green">
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CheckCircleIcon color="success" />
-                      Green - Swimming Allowed
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="yellow">
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <WarningIcon color="warning" />
-                      Yellow - Medium Risk
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="red">
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <WarningIcon color="error" />
-                      Red - High Risk
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="black">
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CancelIcon />
-                      Black - Swimming Prohibited
-                    </Box>
-                  </MenuItem>
-                </Select>
-                {errors.flag_status && (
-                  <FormHelperText error>{errors.flag_status}</FormHelperText>
-                )}
-              </FormControl>
-
-              <TextField
-                fullWidth
-                label="Reason"
-                multiline
-                rows={3}
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                error={!!errors.reason}
-                helperText={errors.reason || 'Explain why this flag status is being set'}
-                sx={{ mb: 3 }}
-              />
-
-              <DateTimePicker
-                label="Expires At (Optional)"
-                value={formData.expires_at ? parseISO(formData.expires_at) : null}
-                onChange={(date) => setFormData({ 
-                  ...formData, 
-                  expires_at: date ? date.toISOString() : undefined 
-                })}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    error: !!errors.expires_at,
-                    helperText: errors.expires_at || 'Leave empty for no expiry'
-                  }
-                }}
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button onClick={handleSubmit} variant="contained">
-              {editingFlag ? 'Update Flag' : 'Set Flag'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Snackbar */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-        >
-          <Alert
-            onClose={() => setSnackbar({ ...snackbar, open: false })}
-            severity={snackbar.severity}
-            sx={{ width: '100%' }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
-    </LocalizationProvider>
+      <Snackbar
+        open={!!success}
+        autoHideDuration={6000}
+        onClose={() => setSuccess(null)}
+      >
+        <Alert onClose={() => setSuccess(null)} severity="success">
+          {success}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

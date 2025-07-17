@@ -349,18 +349,28 @@ class ApiService {
   async setSafetyFlag(centerId: string, flagData: {
     flag_status: 'green' | 'yellow' | 'red' | 'black';
     reason?: string;
-    expires_at?: string;
+    expires_at?: Date;
   }): Promise<SafetyFlag> {
-    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.post(`/api/v1/safety/centers/${centerId}/flags`, flagData);
+    // Convert Date to ISO string for API
+    const apiData = {
+      ...flagData,
+      expires_at: flagData.expires_at ? flagData.expires_at.toISOString() : undefined
+    };
+    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.post(`/api/v1/safety/centers/${centerId}/flags`, apiData);
     return response.data.data!;
   }
 
   async updateSafetyFlag(flagId: string, flagData: {
     flag_status: 'green' | 'yellow' | 'red' | 'black';
     reason?: string;
-    expires_at?: string;
+    expires_at?: Date;
   }): Promise<SafetyFlag> {
-    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.put(`/api/v1/safety/flags/${flagId}`, flagData);
+    // Convert Date to ISO string for API
+    const apiData = {
+      ...flagData,
+      expires_at: flagData.expires_at ? flagData.expires_at.toISOString() : undefined
+    };
+    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.put(`/api/v1/safety/flags/${flagId}`, apiData);
     return response.data.data!;
   }
 
@@ -393,9 +403,14 @@ class ApiService {
   async switchToManualMode(centerId: string, flagData: {
     flag_status: 'green' | 'yellow' | 'red' | 'black';
     reason?: string;
-    expires_at?: string;
+    expires_at?: Date;
   }): Promise<SafetyFlag> {
-    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.post(`/api/v1/safety/centers/${centerId}/manual`, flagData);
+    // Convert Date to ISO string for API
+    const apiData = {
+      ...flagData,
+      expires_at: flagData.expires_at ? flagData.expires_at.toISOString() : undefined
+    };
+    const response: AxiosResponse<ApiResponse<SafetyFlag>> = await this.api.post(`/api/v1/safety/centers/${centerId}/manual`, apiData);
     return response.data.data!;
   }
 
@@ -812,6 +827,17 @@ class ApiService {
       require_location_check_in: requireLocationCheckIn
     });
     return response.data.data!;
+  }
+
+  // Safety Flag Management
+  async getSafetyFlags(centerId: string) {
+    const response = await this.api.get(`/api/v1/safety/centers/${centerId}/history`);
+    return response.data;
+  }
+
+  async triggerAutoUpdate(centerId: string) {
+    const response = await this.api.post(`/api/v1/safety/centers/${centerId}/auto-update`);
+    return response.data;
   }
 }
 
