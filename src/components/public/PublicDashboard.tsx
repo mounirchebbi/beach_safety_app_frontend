@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import {
   Box,
   Typography,
@@ -30,6 +30,7 @@ import {
   AcUnit,
   Thunderstorm,
   Grain,
+  Help,
 } from '@mui/icons-material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Circle, Marker, Popup, useMapEvents } from 'react-leaflet';
@@ -48,6 +49,43 @@ L.Icon.Default.mergeOptions({
   iconUrl: require('leaflet/dist/images/marker-icon.png'),
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
+
+// Error boundary for map components
+class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Map error caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Box sx={{ 
+          height: '100%', 
+          width: '100%', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          bgcolor: '#f5f5f5'
+        }}>
+          <Typography variant="h6" color="text.secondary">
+            Map loading error. Please refresh the page.
+          </Typography>
+        </Box>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 // Classic red marker icon for user location
 const userLocationIcon = new L.Icon({
@@ -78,7 +116,7 @@ const PublicDashboard: React.FC = () => {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false);
-  const [locationSource, setLocationSource] = useState<'gps' | 'manual' | 'mobile' | null>(null);
+  const [locationSource, setLocationSource] = useState<'gps' | 'manual' | 'mobile' | 'ip' | null>(null);
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
@@ -91,6 +129,13 @@ const PublicDashboard: React.FC = () => {
     fetchData();
     // Automatically get user location when component mounts
     getUserLocation();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      // Cleanup any pending operations
+      setIsLocating(false);
+      setLocationError(null);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -182,11 +227,67 @@ const PublicDashboard: React.FC = () => {
           setManualLocation(lat, lng);
         }
       },
+      zoomend: () => {
+        // Handle zoom end to prevent errors
+        try {
+          // Force a small delay to ensure DOM is ready
+          setTimeout(() => {
+            // This helps prevent the "el is undefined" error
+          }, 10);
+        } catch (error) {
+          console.warn('Map zoom error handled:', error);
+        }
+      },
     });
     return null;
   };
 
-  const getUserLocation = () => {
+  const checkLocationPermission = async (): Promise<boolean> => {
+    if (!navigator.permissions) {
+      console.log('Permissions API not available, proceeding with geolocation request');
+      return true;
+    }
+
+    try {
+      const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+      console.log('Location permission status:', permission.state);
+      
+      if (permission.state === 'denied') {
+        setLocationError('Location access is denied. Please enable location permissions in your browser settings and refresh the page.');
+        setIsLocating(false);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.log('Could not check location permission, proceeding anyway:', error);
+      return true;
+    }
+  };
+
+  const detectBrowserIssues = (): string[] => {
+    const issues: string[] = [];
+    
+    // Check if we're in a secure context
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      issues.push('HTTPS required for location access');
+    }
+    
+    // Check browser compatibility
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('safari') && !userAgent.includes('chrome')) {
+      issues.push('Safari may require manual location permission');
+    }
+    
+    // Check if geolocation is supported
+    if (!navigator.geolocation) {
+      issues.push('Geolocation not supported by this browser');
+    }
+    
+    return issues;
+  };
+
+  const getUserLocation = async () => {
     setIsLocating(true);
     setLocationError(null);
     setIsManualMode(false);
@@ -200,19 +301,58 @@ const PublicDashboard: React.FC = () => {
       return;
     }
 
+    // Check if we're in a secure context (HTTPS)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setLocationError('Location access requires HTTPS. Please use manual mode or enable location permissions.');
+      setIsLocating(false);
+      return;
+    }
+
+    // Check location permission
+    const hasPermission = await checkLocationPermission();
+    if (!hasPermission) {
+      return;
+    }
+
     // Test with different options
     const testLocation = (options: PositionOptions, attempt: number = 1) => {
       console.log(`Location attempt ${attempt} with options:`, options);
       
+      const timeoutId = setTimeout(() => {
+        console.log(`Location attempt ${attempt} timed out`);
+        if (attempt === 1) {
+          // Try with lower accuracy on timeout
+          testLocation({
+            enableHighAccuracy: false,
+            timeout: 15000,
+            maximumAge: 300000
+          }, 2);
+        } else {
+          setLocationError('Location request timed out. Please try manual mode or check your GPS settings.');
+          setIsLocating(false);
+        }
+      }, (options.timeout || 10000) + 1000); // Add 1 second buffer
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          clearTimeout(timeoutId);
           const { latitude, longitude, accuracy } = position.coords;
           console.log('Location success:', { latitude, longitude, accuracy });
+          
+          // Validate coordinates
+          if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            console.error('Invalid coordinates received:', { latitude, longitude });
+            setLocationError('Invalid GPS coordinates received. Please try again or use manual mode.');
+            setIsLocating(false);
+            return;
+          }
+          
           setUserLocation([latitude, longitude]);
           setLocationSource('gps');
           setIsLocating(false);
         },
         (error) => {
+          clearTimeout(timeoutId);
           console.error(`Location attempt ${attempt} failed:`, error);
           console.error('Error details:', {
             code: error.code,
@@ -226,7 +366,7 @@ const PublicDashboard: React.FC = () => {
           
           switch (error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = 'Location access denied. Please enable location services or use manual mode.';
+              errorMessage = 'Location access denied. Please enable location services in your browser settings or use manual mode.';
               break;
             case error.POSITION_UNAVAILABLE:
               if (attempt === 1) {
@@ -237,17 +377,65 @@ const PublicDashboard: React.FC = () => {
                   maximumAge: 300000
                 }, 2);
                 return;
+              } else if (attempt === 2) {
+                console.log('GPS still unavailable, trying IP-based location...');
+                getIPBasedLocation();
+                return;
               } else {
                 errorMessage = 'GPS unavailable. You can set your location manually by clicking the map.';
               }
               break;
             case error.TIMEOUT:
-              errorMessage = 'Location request timed out.';
+              if (attempt === 1) {
+                console.log('First attempt timed out, trying with lower accuracy...');
+                testLocation({
+                  enableHighAccuracy: false,
+                  timeout: 15000,
+                  maximumAge: 300000
+                }, 2);
+                return;
+              } else if (attempt === 2) {
+                console.log('Second attempt timed out, trying IP-based location...');
+                getIPBasedLocation();
+                return;
+              } else {
+                errorMessage = 'Location request timed out. Please try manual mode or check your GPS settings.';
+              }
               break;
+            default:
+              if (attempt === 1) {
+                console.log('Unknown error, trying with lower accuracy...');
+                testLocation({
+                  enableHighAccuracy: false,
+                  timeout: 15000,
+                  maximumAge: 300000
+                }, 2);
+                return;
+              } else if (attempt === 2) {
+                console.log('Unknown error on second attempt, trying IP-based location...');
+                getIPBasedLocation();
+                return;
+              } else {
+                errorMessage = 'Unable to determine your location. Please use manual mode or check your GPS settings.';
+              }
+              break;
+          }
+          
+          // Detect browser-specific issues
+          const browserIssues = detectBrowserIssues();
+          if (browserIssues.length > 0) {
+            console.log('Browser issues detected:', browserIssues);
+            errorMessage += `\n\nBrowser issues: ${browserIssues.join(', ')}`;
           }
           
           setLocationError(errorMessage);
           setIsLocating(false);
+          
+          // If all attempts failed, try IP-based location as fallback
+          if (attempt === 2) {
+            console.log('Trying IP-based location as fallback...');
+            getIPBasedLocation();
+          }
         },
         options
       );
@@ -259,6 +447,168 @@ const PublicDashboard: React.FC = () => {
       timeout: 10000,
       maximumAge: 60000
     });
+  };
+
+
+
+  const validateCoordinates = (lat: number, lng: number): boolean => {
+    return (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && 
+            !isNaN(lat) && !isNaN(lng) && 
+            (lat !== 0 || lng !== 0)); // Avoid null island (0,0)
+  };
+
+  const calculateAccuracy = (data: any): number => {
+    // Estimate accuracy based on available data
+    if (data.accuracy) return data.accuracy;
+    if (data.uncertainty) return data.uncertainty;
+    if (data.radius) return data.radius;
+    
+    // Default accuracy estimates based on service type
+    if (data.org && data.org.includes('ISP')) return 5000; // ISP level
+    if (data.org && data.org.includes('Mobile')) return 1000; // Mobile network
+    return 2000; // Default city-level accuracy
+  };
+
+  const getIPBasedLocation = async () => {
+    const ipServices = [
+      {
+        url: 'https://ipapi.co/json/',
+        name: 'ipapi.co',
+        timeout: 5000
+      },
+      {
+        url: 'https://ipinfo.io/json',
+        name: 'ipinfo.io', 
+        timeout: 5000
+      },
+      {
+        url: 'https://api.ipify.org?format=json',
+        name: 'ipify.org',
+        timeout: 3000
+      },
+      {
+        url: 'https://ip-api.com/json/',
+        name: 'ip-api.com',
+        timeout: 5000
+      },
+      {
+        url: 'https://api.myip.com',
+        name: 'myip.com',
+        timeout: 4000
+      }
+    ];
+
+    const locationResults: Array<{
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      service: string;
+      city?: string;
+      country?: string;
+    }> = [];
+
+    // Try all services in parallel for better accuracy
+    const promises = ipServices.map(async (service, index) => {
+      try {
+        console.log(`Attempting IP-based location with ${service.name}...`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), service.timeout);
+        
+        const response = await fetch(service.url, {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'BeachSafetyApp/1.0'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`${service.name} response:`, data);
+        
+        let latitude: number | null = null;
+        let longitude: number | null = null;
+        
+        // Handle different response formats
+        if (data.latitude && data.longitude) {
+          latitude = parseFloat(data.latitude);
+          longitude = parseFloat(data.longitude);
+        } else if (data.lat && data.lon) {
+          latitude = parseFloat(data.lat);
+          longitude = parseFloat(data.lon);
+        } else if (data.loc) {
+          const [lat, lng] = data.loc.split(',').map(Number);
+          latitude = lat;
+          longitude = lng;
+        } else if (data.query && data.lat && data.lon) {
+          latitude = parseFloat(data.lat);
+          longitude = parseFloat(data.lon);
+        } else if (data.ip) {
+          // Fallback: try to get location from IP
+          try {
+            const geoResponse = await fetch(`https://ipapi.co/${data.ip}/json/`, {
+              signal: controller.signal
+            });
+            const geoData = await geoResponse.json();
+            if (geoData.latitude && geoData.longitude) {
+              latitude = parseFloat(geoData.latitude);
+              longitude = parseFloat(geoData.longitude);
+            }
+          } catch (fallbackError) {
+            console.log(`Fallback location lookup failed for ${data.ip}`);
+          }
+        }
+        
+        if (latitude && longitude && validateCoordinates(latitude, longitude)) {
+          const accuracy = calculateAccuracy(data);
+          locationResults.push({
+            latitude,
+            longitude,
+            accuracy,
+            service: service.name,
+            city: data.city || data.city_name,
+            country: data.country || data.country_name
+          });
+          console.log(`${service.name} location:`, { latitude, longitude, accuracy });
+        }
+        
+      } catch (error) {
+        console.error(`${service.name} failed:`, error);
+      }
+    });
+
+    await Promise.allSettled(promises);
+    
+    if (locationResults.length === 0) {
+      console.error('All IP-based location services failed');
+      setLocationError('Unable to determine your location automatically. Please use manual mode by clicking on the map.');
+      setIsLocating(false);
+      return;
+    }
+
+    // Find the most accurate result (lowest accuracy value)
+    const bestResult = locationResults.reduce((best, current) => 
+      current.accuracy < best.accuracy ? current : best
+    );
+
+    console.log('Best IP location result:', bestResult);
+    
+    // Set the most precise location
+    setUserLocation([bestResult.latitude, bestResult.longitude]);
+    setLocationSource('ip');
+    setIsLocating(false);
+    setLocationError(null);
+    
+    // Log additional location details
+    if (bestResult.city || bestResult.country) {
+      console.log(`Location: ${bestResult.city || 'Unknown'}, ${bestResult.country || 'Unknown'} (Accuracy: ~${bestResult.accuracy}m)`);
+    }
   };
 
   const enableManualMode = () => {
@@ -370,13 +720,23 @@ const PublicDashboard: React.FC = () => {
       {/* Main Map Section (map and overlays only) */}
       <Box sx={{ position: 'relative', height: 'calc(100vh - 72px)', width: '100vw' }}>
         {/* Map Container */}
-        <Box sx={{ height: '100%', width: '100%' }}>
-          <MapContainer
+        <MapErrorBoundary>
+          <Box 
+            sx={{ height: '100%', width: '100%' }}
+            onError={(error) => {
+              console.error('Map container error:', error);
+            }}
+          >
+            <MapContainer
             center={mapCenter}
             zoom={8}
             style={{ height: '100%', width: '100%' }}
             zoomControl={true}
             scrollWheelZoom={true}
+            whenReady={() => {
+              // Map is ready
+              console.log('Map is ready');
+            }}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -388,7 +748,18 @@ const PublicDashboard: React.FC = () => {
             {userLocation && (
               <>
                 {/* Pulsing background effect */}
-                <Marker position={userLocation} icon={userLocationIconPulse}>
+                <Marker 
+                  position={userLocation} 
+                  icon={userLocationIconPulse}
+                  eventHandlers={{
+                    add: () => {
+                      console.log('User location marker added');
+                    },
+                    remove: () => {
+                      console.log('User location marker removed');
+                    }
+                  }}
+                >
                   <Popup>
                     <Box sx={{ minWidth: 150 }}>
                       <Typography variant="h6" fontWeight="bold" gutterBottom>
@@ -404,16 +775,23 @@ const PublicDashboard: React.FC = () => {
                         label={
                           locationSource === 'gps' ? 'GPS Location' : 
                           locationSource === 'mobile' ? 'Mobile GPS' : 
+                          locationSource === 'ip' ? 'IP Location' :
                           'Manual Location'
                         } 
                         size="small" 
                         color={
                           locationSource === 'gps' ? 'primary' : 
                           locationSource === 'mobile' ? 'success' : 
+                          locationSource === 'ip' ? 'info' :
                           'secondary'
                         }
                         sx={{ mt: 1, mb: 1 }}
                       />
+                      {locationSource === 'ip' && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', fontStyle: 'italic' }}>
+                          Estimated accuracy: ~2-5km
+                        </Typography>
+                      )}
                       <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
                         <Button
                           onClick={() => setManualLocation(userLocation[0], userLocation[1])}
@@ -437,7 +815,18 @@ const PublicDashboard: React.FC = () => {
                   </Popup>
                 </Marker>
                 {/* Main location marker */}
-                <Marker position={userLocation} icon={userLocationIcon} />
+                <Marker 
+                  position={userLocation} 
+                  icon={userLocationIcon}
+                  eventHandlers={{
+                    add: () => {
+                      console.log('Main location marker added');
+                    },
+                    remove: () => {
+                      console.log('Main location marker removed');
+                    }
+                  }}
+                />
               </>
             )}
 
@@ -720,7 +1109,8 @@ const PublicDashboard: React.FC = () => {
               );
             })}
           </MapContainer>
-        </Box>
+          </Box>
+        </MapErrorBoundary>
 
         {/* Overlay Controls */}
         <Box sx={{ position: 'absolute', top: 20, right: 20, zIndex: 1000 }}>
@@ -765,6 +1155,7 @@ const PublicDashboard: React.FC = () => {
                 <Map />
               </IconButton>
             </Tooltip>
+
             <Tooltip title="Refresh Data">
               <IconButton onClick={fetchData} size="small">
                 <Refresh />
@@ -836,6 +1227,57 @@ const PublicDashboard: React.FC = () => {
                   startIcon={<Map />}
                 >
                   Set Manually
+                </Button>
+
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => {
+                    setLocationError(null);
+                    // Show comprehensive help dialog
+                    const browserIssues = detectBrowserIssues();
+                    let helpText = `Location Troubleshooting Tips:
+
+1. Check Browser Permissions:
+   - Click the lock/info icon in your browser's address bar
+   - Ensure location access is "Allow" or "Ask"
+   - Clear site data and try again
+
+2. Enable Location Services:
+   - On Windows: Settings > Privacy > Location > On
+   - On Mac: System Preferences > Security & Privacy > Location Services
+   - On Mobile: Settings > Privacy > Location Services
+
+3. Try Different Methods:
+   - GPS button (most accurate)
+   - Mobile GPS button (if on mobile device)
+   - Manual mode (click on map)
+
+4. Browser Compatibility:
+   - Chrome, Firefox, Safari, Edge work best
+   - HTTPS required for location access
+   - Try a different browser
+
+5. Network Issues:
+   - Check your internet connection
+   - Try refreshing the page
+   - Disable VPN if using one
+
+6. System Issues:
+   - Restart your browser
+   - Check if GPS is enabled on your device
+   - Try on a different device
+
+Current Browser Issues: ${browserIssues.length > 0 ? browserIssues.join(', ') : 'None detected'}
+
+If all else fails, you can still use the map by clicking anywhere to set your location manually.`;
+                    
+                    alert(helpText);
+                  }}
+                  startIcon={<Help />}
+                  color="info"
+                >
+                  Help
                 </Button>
               </Box>
             </Alert>

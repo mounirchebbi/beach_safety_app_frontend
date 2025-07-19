@@ -377,85 +377,8 @@ const CenterDashboard: React.FC = () => {
 
       {/* Main Content Grid */}
       <Grid container spacing={3}>
-        {/* Center Information */}
-        <Grid item xs={12} lg={4}>
-          <Card elevation={2}>
-            <CardContent sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                <Box sx={{ 
-                  p: 1.5, 
-                  borderRadius: 2, 
-                  bgcolor: 'primary.light',
-                  color: 'primary.dark'
-                }}>
-                  <BusinessIcon sx={{ fontSize: 28 }} />
-                </Box>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Center Information
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Contact and location details
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Stack spacing={2}>
-                {center.description && (
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Description
-                    </Typography>
-                    <Typography variant="body1">
-                      {center.description}
-                    </Typography>
-                  </Box>
-                )}
-
-                {center.address && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <LocationIcon color="primary" />
-                    <Typography variant="body1">
-                      {center.address}
-                    </Typography>
-                  </Box>
-                )}
-
-                {center.phone && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <PhoneIcon color="primary" />
-                    <Typography variant="body1">
-                      {center.phone}
-                    </Typography>
-                  </Box>
-                )}
-
-                {center.email && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <EmailIcon color="primary" />
-                    <Typography variant="body1">
-                      {center.email}
-                    </Typography>
-                  </Box>
-                )}
-
-                <Divider sx={{ my: 2 }} />
-
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<BusinessIcon />}
-                  onClick={() => navigate('/admin/center')}
-                >
-                  Edit Center Details
-                </Button>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-
         {/* Weather Widget */}
-        <Grid item xs={12} lg={8}>
+        <Grid item xs={12}>
           <Card elevation={2}>
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>

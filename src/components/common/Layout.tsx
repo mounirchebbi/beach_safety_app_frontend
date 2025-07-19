@@ -86,13 +86,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       case 'center_admin':
         return [
           { text: 'Dashboard', icon: <Dashboard />, path: '/admin' },
-          { text: 'Center Management', icon: <LocationOn />, path: '/admin/center' },
           { text: 'Lifeguard Management', icon: <People />, path: '/admin/lifeguards' },
           { text: 'Shift Scheduling', icon: <Schedule />, path: '/admin/shifts' },
-          { text: 'Safety Management', icon: <Security />, path: '/admin/safety' },
+          { text: 'Safety Flags Management', icon: <Security />, path: '/admin/safety' },
+          { text: 'Zones Management', icon: <BeachAccess />, path: '/admin/safety-zones' },
           { text: 'Incident Reports', icon: <Report />, path: '/admin/reports' },
           { text: 'Emergency Escalations', icon: <Warning />, path: '/admin/escalations' },
           { text: 'Inter-Center Support', icon: <AdminPanelSettings />, path: '/admin/inter-center-support' },
+          { text: 'Center Information', icon: <LocationOn />, path: '/admin/center' },
         ];
       case 'system_admin':
         return [

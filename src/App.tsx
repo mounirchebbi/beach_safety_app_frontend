@@ -32,6 +32,7 @@ import CenterManagement from './components/admin/CenterManagement';
 import LifeguardManagement from './components/admin/LifeguardManagement';
 import ShiftScheduling from './components/admin/ShiftScheduling';
 import SafetyManagement from './components/admin/SafetyManagement';
+import SafetyZonesManagement from './components/admin/SafetyZonesManagement';
 import AdminIncidentReports from './components/admin/IncidentReports';
 import AdminEmergencyAlerts from './components/admin/AdminEmergencyAlerts';
 import EscalationManagement from './components/admin/EscalationManagement';
@@ -184,6 +185,7 @@ const AppContent: React.FC = () => {
                 <Route path="/lifeguards" element={<LifeguardManagement />} />
                 <Route path="/shifts" element={<ShiftScheduling />} />
                 <Route path="/safety" element={<SafetyManagement />} />
+                <Route path="/safety-zones" element={<SafetyZonesManagement />} />
                 <Route path="/alerts" element={<AdminEmergencyAlerts />} />
                 <Route path="/reports" element={<AdminIncidentReports />} />
                 <Route path="/escalations" element={<EscalationManagement />} />
