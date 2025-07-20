@@ -16,7 +16,6 @@ import {
   Menu,
   MenuItem,
   Divider,
-  Badge,
   Chip,
 } from '@mui/material';
 import {
@@ -26,10 +25,8 @@ import {
   Schedule,
   Warning,
   Report,
-  Settings,
   AccountCircle,
   Logout,
-  Notifications,
   BeachAccess,
   LocationOn,
   Security,
@@ -221,13 +218,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {navigationItems.find(item => item.path === location.pathname)?.text || 'Beach Safety App'}
           </Typography>
           
-          {/* Notifications */}
-          <IconButton color="inherit" sx={{ mr: 1 }}>
-            <Badge badgeContent={4} color="error">
-              <Notifications />
-            </Badge>
-          </IconButton>
-          
           {/* Profile Menu */}
           <IconButton
             color="inherit"
@@ -253,12 +243,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <AccountCircle fontSize="small" />
           </ListItemIcon>
           Profile
-        </MenuItem>
-        <MenuItem onClick={() => navigate('/settings')}>
-          <ListItemIcon>
-            <Settings fontSize="small" />
-          </ListItemIcon>
-          Settings
         </MenuItem>
         <Divider />
         <MenuItem onClick={handleLogout}>

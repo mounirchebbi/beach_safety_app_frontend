@@ -32,7 +32,8 @@ import {
   CheckCircle as CheckCircleIcon,
   LocalHospital as EmergencyIcon,
   Visibility as VisibilityIcon,
-  Check as CheckIcon
+  Check as CheckIcon,
+  WbSunny
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -691,30 +692,67 @@ const LifeguardDashboard: React.FC = () => {
         {/* Weather Widget - Enhanced */}
         {user?.center_info?.id && (
           <Grid item xs={12}>
-            <Card elevation={1}>
-              <CardContent sx={{ p: 3 }}>
+            <Card elevation={1} sx={{ 
+              background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Background Pattern */}
+              <Box sx={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)',
+                zIndex: 0
+              }} />
+              <Box sx={{
+                position: 'absolute',
+                bottom: -30,
+                left: -30,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.05)',
+                zIndex: 0
+              }} />
+              
+              <CardContent sx={{ p: 3, position: 'relative', zIndex: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                   <Box sx={{ 
-                    p: 1.5, 
-                    borderRadius: 2, 
-                    bgcolor: 'primary.light',
-                    color: 'primary.dark'
+                    p: 2, 
+                    borderRadius: 3, 
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)'
                   }}>
-                    <VisibilityIcon sx={{ fontSize: 28 }} />
+                    <WbSunny sx={{ fontSize: 32, color: 'white' }} />
                   </Box>
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
                       Current Conditions
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Real-time weather and marine conditions
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      Real-time weather and marine conditions for {user.center_info.name}
                     </Typography>
                   </Box>
                 </Box>
-                <WeatherWidget 
-                  centerId={user.center_info.id} 
-                  centerName={user.center_info.name || 'Your Center'} 
-                />
+                
+                <Box sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  borderRadius: 3, 
+                  p: 3,
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <WeatherWidget 
+                    centerId={user.center_info.id} 
+                    centerName={user.center_info.name || 'Your Center'} 
+                  />
+                </Box>
               </CardContent>
             </Card>
           </Grid>

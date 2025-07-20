@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import { Icon, LatLng } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Box, Typography, Paper, Chip, Alert } from '@mui/material';
+import { Box, Typography, Paper, Chip, Alert, CircularProgress, Button } from '@mui/material';
 import { BeachAccess, Warning, CheckCircle, LocationOn, WbSunny, Air, Visibility, Person } from '@mui/icons-material';
 import { SafetyZone } from '../../types';
 
@@ -91,14 +91,34 @@ const MapUpdater: React.FC<{ center: [number, number]; zoom: number }> = ({ cent
   
   useEffect(() => {
     if (map && center && zoom) {
-      // Add a small delay to ensure map is fully initialized
+      // Add a shorter delay to ensure map is fully initialized
       const timer = setTimeout(() => {
         try {
-          map.setView(center, zoom);
+          // Check if map container exists and is ready
+          const container = map.getContainer();
+          if (container && container.style) {
+            // Check if map is properly initialized by checking if it has a size
+            const size = map.getSize();
+            if (size && size.x > 0 && size.y > 0) {
+              map.setView(center, zoom, { animate: true });
+            } else {
+              // If map is not fully loaded, try again after a shorter delay
+              setTimeout(() => {
+                try {
+                  const retrySize = map.getSize();
+                  if (retrySize && retrySize.x > 0 && retrySize.y > 0) {
+                    map.setView(center, zoom, { animate: true });
+                  }
+                } catch (error) {
+                  console.warn('Map update retry failed:', error);
+                }
+              }, 100);
+            }
+          }
         } catch (error) {
           console.warn('Map update failed:', error);
         }
-      }, 100);
+      }, 200); // Reduced delay to 200ms for faster response
       
       return () => clearTimeout(timer);
     }
@@ -145,6 +165,9 @@ const BeachMap: React.FC<BeachMapProps> = ({
   const [mapZoom, setMapZoom] = useState(12);
   const [userLocationState, setUserLocationState] = useState<{ lat: number; lng: number } | null>(userLocation || null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapInitialized, setMapInitialized] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Get user location on component mount
   useEffect(() => {
@@ -170,6 +193,46 @@ const BeachMap: React.FC<BeachMapProps> = ({
       setMapCenter([avgLat, avgLng]);
     }
   }, [centers]);
+
+  // Set map as ready after a short delay to ensure proper initialization
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMapReady(true);
+      setMapInitialized(true);
+    }, 1000); // Give map time to initialize
+
+    // Add a timeout to prevent infinite loading
+    const timeoutTimer = setTimeout(() => {
+      if (!mapReady) {
+        setMapError('Map initialization timeout. Please try again.');
+      }
+    }, 10000); // 10 second timeout
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(timeoutTimer);
+    };
+  }, [mapReady]);
+
+  // Handle map ready event
+  const handleMapReady = () => {
+    setMapReady(true);
+    setMapError(null);
+  };
+
+  // Handle map error
+  const handleMapError = (error: any) => {
+    console.error('Map error:', error);
+    setMapError('Failed to load map');
+  };
+
+  // Retry map loading
+  const handleRetry = () => {
+    setMapError(null);
+    setMapReady(false);
+    setMapInitialized(false);
+    setRetryCount(prev => prev + 1);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -201,10 +264,10 @@ const BeachMap: React.FC<BeachMapProps> = ({
 
   const getSafetyZoneColor = (type: string) => {
     switch (type) {
-      case 'no_swim': return '#f44336';
+      case 'no_swim': return '#d32f2f';
       case 'caution': return '#ff9800';
       case 'safe': return '#4caf50';
-      default: return '#9e9e9e';
+      default: return '#757575';
     }
   };
 
@@ -213,33 +276,40 @@ const BeachMap: React.FC<BeachMapProps> = ({
       case 'no_swim': return 'No Swim Zone';
       case 'caution': return 'Caution Zone';
       case 'safe': return 'Safe Zone';
-      default: return type;
+      default: return 'Safety Zone';
     }
   };
 
-  // Helper function to calculate radius from polygon geometry
   const calculateRadiusFromGeometry = (geometry: GeoJSON.Polygon) => {
+    if (!geometry || !geometry.coordinates || geometry.coordinates.length === 0) {
+      return 100; // Default radius
+    }
+
     const coordinates = geometry.coordinates[0];
-    const centerLat = coordinates.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coordinates.length;
-    const centerLng = coordinates.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coordinates.length;
-    
-    // Calculate radius by finding the maximum distance from center to any point in the polygon
-    let maxDistance = 0;
+    if (coordinates.length < 3) {
+      return 100; // Default radius
+    }
+
+    // Calculate center point
+    let centerLat = 0;
+    let centerLng = 0;
     coordinates.forEach((coord: number[]) => {
-      const distance = Math.sqrt(
-        Math.pow(coord[0] - centerLng, 2) + Math.pow(coord[1] - centerLat, 2)
-      );
-      if (distance > maxDistance) {
-        maxDistance = distance;
-      }
+      centerLat += coord[1];
+      centerLng += coord[0];
     });
-    
-    // Convert from degrees to meters (approximate)
-    const latRad = centerLat * Math.PI / 180;
-    const metersPerDegreeLng = 111320 * Math.cos(latRad);
-    const radiusInMeters = maxDistance * Math.max(111320, metersPerDegreeLng);
-    
-    return Math.round(radiusInMeters);
+    centerLat /= coordinates.length;
+    centerLng /= coordinates.length;
+
+    // Calculate average radius
+    let totalDistance = 0;
+    coordinates.forEach((coord: number[]) => {
+      const latDiff = coord[1] - centerLat;
+      const lngDiff = coord[0] - centerLng;
+      const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+      totalDistance += distance;
+    });
+
+    return (totalDistance / coordinates.length) * 111000; // Convert to meters
   };
 
   const getFlagColor = (flagStatus: string) => {
@@ -247,31 +317,106 @@ const BeachMap: React.FC<BeachMapProps> = ({
       case 'green': return '#4caf50';
       case 'yellow': return '#ff9800';
       case 'red': return '#f44336';
-      case 'black': return '#000000';
-      default: return '#4caf50';
+      case 'black': return '#212121';
+      default: return '#757575';
     }
   };
 
   const getFlagText = (flagStatus: string) => {
     switch (flagStatus) {
-      case 'green': return 'SAFE TO SWIM';
-      case 'yellow': return 'CAUTION';
-      case 'red': return 'DANGEROUS CONDITIONS';
-      case 'black': return 'BEACH CLOSED';
-      default: return 'SAFE TO SWIM';
+      case 'green': return 'SAFE CONDITIONS';
+      case 'yellow': return 'CAUTION - MODERATE RISK';
+      case 'red': return 'DANGER - HIGH RISK';
+      case 'black': return 'EXTREME DANGER';
+      default: return 'UNKNOWN CONDITIONS';
     }
   };
 
-  // Helper function to convert polygon to circle for display
   const getZoneCenterAndRadius = (zone: SafetyZone) => {
+    if (!zone.geometry || !zone.geometry.coordinates || zone.geometry.coordinates.length === 0) {
+      return { center: [0, 0] as [number, number], radius: 100 };
+    }
+
     const coordinates = zone.geometry.coordinates[0];
-    const centerLat = coordinates.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coordinates.length;
-    const centerLng = coordinates.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coordinates.length;
+    if (coordinates.length < 3) {
+      return { center: [0, 0] as [number, number], radius: 100 };
+    }
+
+    // Calculate center point
+    let centerLat = 0;
+    let centerLng = 0;
+    coordinates.forEach((coord: number[]) => {
+      centerLat += coord[1];
+      centerLng += coord[0];
+    });
+    centerLat /= coordinates.length;
+    centerLng /= coordinates.length;
     
     const radius = calculateRadiusFromGeometry(zone.geometry);
     
-    return { center: [centerLat, centerLng], radius };
+    return { center: [centerLat, centerLng] as [number, number], radius };
   };
+
+  // Show error state if map fails to load
+  if (mapError) {
+    return (
+      <Box sx={{ 
+        width: '100%', 
+        height: '600px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        bgcolor: '#f5f5f5',
+        borderRadius: 2
+      }}>
+        <Alert severity="error" sx={{ maxWidth: 400 }}>
+          <Typography variant="h6" gutterBottom>
+            Map Loading Error
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            {mapError}. Please try again.
+          </Typography>
+          <Button 
+            variant="contained" 
+            onClick={handleRetry}
+            sx={{ mt: 1 }}
+          >
+            Retry Loading Map
+          </Button>
+        </Alert>
+      </Box>
+    );
+  }
+
+  // Show loading state while map is initializing
+  if (!mapReady) {
+    return (
+      <Box sx={{ 
+        width: '100%', 
+        height: '600px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        bgcolor: '#f5f5f5',
+        borderRadius: 2
+      }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Loading Map...
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Please wait while the map initializes
+          </Typography>
+          {retryCount > 0 && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              Retry attempt: {retryCount}
+            </Typography>
+          )}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ width: '100%', height: '600px', position: 'relative' }}>
@@ -281,9 +426,10 @@ const BeachMap: React.FC<BeachMapProps> = ({
         style={{ height: '100%', width: '100%' }}
         zoomControl={true}
         scrollWheelZoom={true}
-        whenReady={() => setMapReady(true)}
+        whenReady={handleMapReady}
+        key={`map-${mapInitialized ? 'ready' : 'loading'}`} // Force re-render when ready
       >
-        {center && zoom && mapReady && <MapUpdater center={center} zoom={zoom} />}
+        {center && zoom && mapInitialized && <MapUpdater center={center} zoom={zoom} />}
         
         {/* Base tile layer */}
         <TileLayer
@@ -500,17 +646,17 @@ const BeachMap: React.FC<BeachMapProps> = ({
                       bgcolor: '#fafafa',
                       transform: 'translateY(-2px)',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                      borderColor: '#4caf50'
+                      borderColor: '#2196f3'
                     }
                   }}>
-                    <Air sx={{ color: '#4caf50', mb: 1, fontSize: 24 }} />
+                    <Air sx={{ color: '#2196f3', mb: 1, fontSize: 24 }} />
                     <Typography 
                       variant="h6" 
                       fontWeight="800" 
                       color="primary"
                       sx={{ fontSize: '1.1rem', mb: 0.5 }}
                     >
-                      {center.wind_speed}
+                      {center.wind_speed} km/h
                     </Typography>
                     <Typography 
                       variant="caption" 
@@ -522,7 +668,90 @@ const BeachMap: React.FC<BeachMapProps> = ({
                         letterSpacing: '0.5px'
                       }}
                     >
-                      Wind (km/h)
+                      Wind Speed
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    textAlign: 'center', 
+                    p: 2, 
+                    bgcolor: '#fff', 
+                    borderRadius: 2.5,
+                    border: '2px solid #f0f0f0',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    '&:hover': {
+                      bgcolor: '#fafafa',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      borderColor: '#4caf50'
+                    }
+                  }}>
+                    <Visibility sx={{ color: '#4caf50', mb: 1, fontSize: 24 }} />
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="800" 
+                      color="primary"
+                      sx={{ fontSize: '1.1rem', mb: 0.5 }}
+                    >
+                      {center.visibility}m
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      Visibility
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                {/* Additional Weather Info */}
+                <Box sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  gap: 2,
+                  mb: 2.5
+                }}>
+                  <Box sx={{ 
+                    textAlign: 'center', 
+                    p: 2, 
+                    bgcolor: '#fff', 
+                    borderRadius: 2.5,
+                    border: '2px solid #f0f0f0',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    '&:hover': {
+                      bgcolor: '#fafafa',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      borderColor: '#00bcd4'
+                    }
+                  }}>
+                    <BeachAccess sx={{ color: '#00bcd4', mb: 1, fontSize: 24 }} />
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="800" 
+                      color="primary"
+                      sx={{ fontSize: '1.1rem', mb: 0.5 }}
+                    >
+                      {center.water_temperature}°C
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      Water Temp
                     </Typography>
                   </Box>
                   <Box sx={{ 
@@ -540,14 +769,14 @@ const BeachMap: React.FC<BeachMapProps> = ({
                       borderColor: '#9c27b0'
                     }
                   }}>
-                    <Visibility sx={{ color: '#9c27b0', mb: 1, fontSize: 24 }} />
+                    <Air sx={{ color: '#9c27b0', mb: 1, fontSize: 24 }} />
                     <Typography 
                       variant="h6" 
                       fontWeight="800" 
                       color="primary"
                       sx={{ fontSize: '1.1rem', mb: 0.5 }}
                     >
-                      {center.wave_height}
+                      {center.wave_height}m
                     </Typography>
                     <Typography 
                       variant="caption" 
@@ -559,48 +788,9 @@ const BeachMap: React.FC<BeachMapProps> = ({
                         letterSpacing: '0.5px'
                       }}
                     >
-                      Waves (m)
+                      Wave Height
                     </Typography>
                   </Box>
-                </Box>
-                
-                {/* Enhanced Additional Info */}
-                <Box sx={{ 
-                  p: 2, 
-                  bgcolor: '#f8f9fa', 
-                  borderRadius: 2,
-                  border: '1px solid #e9ecef',
-                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
-                }}>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      mb: 1,
-                      fontWeight: 600,
-                      color: '#2c3e50'
-                    }}
-                  >
-                    <strong>Weather:</strong> {center.weather_condition}
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      mb: 1,
-                      fontWeight: 600,
-                      color: '#2c3e50'
-                    }}
-                  >
-                    <strong>Visibility:</strong> {center.visibility} km
-                  </Typography>
-                  <Typography 
-                    variant="body2"
-                    sx={{ 
-                      fontWeight: 600,
-                      color: '#2c3e50'
-                    }}
-                  >
-                    <strong>Current:</strong> {center.current_speed} m/s
-                  </Typography>
                 </Box>
               </Box>
             </Popup>
@@ -609,17 +799,18 @@ const BeachMap: React.FC<BeachMapProps> = ({
 
         {/* Safety zones */}
         {showSafetyZones && safetyZones.map((zone) => {
-          const { center, radius } = getZoneCenterAndRadius(zone);
+          const { center: zoneCenter, radius } = getZoneCenterAndRadius(zone);
+          
           return (
             <Circle
               key={zone.id}
-              center={center as [number, number]}
+              center={zoneCenter}
               radius={radius}
               pathOptions={{
                 color: getSafetyZoneColor(zone.zone_type),
                 fillColor: getSafetyZoneColor(zone.zone_type),
                 fillOpacity: 0.2,
-                weight: 2,
+                weight: 3
               }}
             >
               <Popup>

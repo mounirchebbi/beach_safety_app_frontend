@@ -14,6 +14,7 @@ import Layout from './components/common/Layout';
 import LoadingScreen from './components/common/LoadingScreen';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
+import Profile from './components/common/Profile';
 
 // Public Pages
 import PublicDashboard from './components/public/PublicDashboard';
@@ -157,6 +158,9 @@ const AppContent: React.FC = () => {
         <Route path="/" element={<PublicDashboard />} />
         <Route path="/dashboard" element={<PublicDashboard />} />
         <Route path="/map" element={<MapPage />} />
+
+        {/* Profile Route - Available to all authenticated users */}
+        <Route path="/profile" element={<Profile />} />
 
         {/* Lifeguard Routes */}
         <Route
