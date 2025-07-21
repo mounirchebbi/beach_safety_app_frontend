@@ -87,6 +87,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { text: 'Shift Scheduling', icon: <Schedule />, path: '/admin/shifts' },
           { text: 'Safety Flags Management', icon: <Security />, path: '/admin/safety' },
           { text: 'Zones Management', icon: <BeachAccess />, path: '/admin/safety-zones' },
+          { text: 'Alerts Management', icon: <Warning />, path: '/admin/alerts' },
           { text: 'Incident Reports', icon: <Report />, path: '/admin/reports' },
           { text: 'Emergency Escalations', icon: <Warning />, path: '/admin/escalations' },
           { text: 'Inter-Center Support', icon: <AdminPanelSettings />, path: '/admin/inter-center-support' },
@@ -218,7 +219,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {navigationItems.find(item => item.path === location.pathname)?.text || 'Beach Safety App'}
           </Typography>
           
-          {/* Profile Menu */}
+          {/* Profile Menu - Always show for logout access */}
           <IconButton
             color="inherit"
             onClick={handleProfileMenuOpen}
@@ -229,7 +230,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Toolbar>
       </AppBar>
       
-      {/* Profile Menu */}
+      {/* Profile Menu - Conditional Profile option for center_admin */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
@@ -238,13 +239,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={() => navigate('/profile')}>
-          <ListItemIcon>
-            <AccountCircle fontSize="small" />
-          </ListItemIcon>
-          Profile
-        </MenuItem>
-        <Divider />
+        {/* Profile option - Hidden for center_admin to avoid repetition */}
+        {user?.role !== 'center_admin' && (
+          <MenuItem onClick={() => navigate('/profile')}>
+            <ListItemIcon>
+              <AccountCircle fontSize="small" />
+            </ListItemIcon>
+            Profile
+          </MenuItem>
+        )}
+        
+        {/* Divider - Only show if Profile option is present */}
+        {user?.role !== 'center_admin' && <Divider />}
+        
+        {/* Logout option - Always available */}
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>
             <Logout fontSize="small" />

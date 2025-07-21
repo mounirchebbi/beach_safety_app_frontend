@@ -31,8 +31,6 @@ import {
   Divider,
   Avatar,
   Badge,
-  Tabs,
-  Tab,
   LinearProgress,
   Fade,
   Accordion,
@@ -47,7 +45,6 @@ import {
   Info as InfoIcon,
   Refresh as RefreshIcon,
   Visibility as ViewIcon,
-  Assignment as AssignIcon,
   Close as CloseIcon,
   FilterList as FilterIcon,
   TrendingUp as TrendingIcon,
@@ -58,9 +55,12 @@ import {
   LocalHospital as MedicalIcon,
   Security as SecurityIcon,
   BeachAccess as BeachIcon,
-  Notifications as NotificationsIcon
+  Notifications as NotificationsIcon,
+  Wifi as WifiIcon,
+  WifiOff as WifiOffIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../hooks/useSocket';
 import { apiService } from '../../services/api';
 import { EmergencyAlert, Lifeguard } from '../../types';
 
@@ -75,29 +75,9 @@ interface AlertStats {
   low: number;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`alerts-tabpanel-${index}`}
-      aria-labelledby={`alerts-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
-    </div>
-  );
-}
-
 const AdminEmergencyAlerts: React.FC = () => {
   const { user } = useAuth();
+  const socket = useSocket();
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [lifeguards, setLifeguards] = useState<Lifeguard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,14 +85,13 @@ const AdminEmergencyAlerts: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('');
-  const [selectedLifeguard, setSelectedLifeguard] = useState<string>('');
-  const [tabValue, setTabValue] = useState(0);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [showAlertNotification, setShowAlertNotification] = useState(false);
   const [stats, setStats] = useState<AlertStats>({
     total: 0,
     active: 0,
@@ -127,6 +106,83 @@ const AdminEmergencyAlerts: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // WebSocket connection and real-time updates
+  useEffect(() => {
+    if (!socket || !user?.center_info?.id) return;
+
+    console.log('Setting up WebSocket connection for center admin:', user.center_info.id);
+    
+    // Check socket connection status
+    if (socket.connected) {
+      console.log('Socket connected successfully');
+      setSocketConnected(true);
+    } else {
+      console.log('Socket not connected, waiting for connection...');
+      socket.on('connect', () => {
+        console.log('Socket connected after waiting');
+        setSocketConnected(true);
+      });
+    }
+
+    // Add connection event listeners
+    socket.on('connect', () => {
+      console.log('Socket connected event fired');
+      setSocketConnected(true);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      setSocketConnected(false);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      setSocketConnected(false);
+    });
+
+    // Listen for emergency alerts
+    socket.on('emergency_alert', (data) => {
+      console.log('New emergency alert received:', data);
+      console.log('Current user center ID:', user?.center_info?.id);
+      console.log('Alert center ID:', data.center_id);
+      if (data.center_id === user?.center_info?.id) {
+        console.log('Alert belongs to this center, refreshing data...');
+        loadData(); // Refresh alerts
+        setShowAlertNotification(true);
+        // Auto-hide notification after 5 seconds
+        setTimeout(() => setShowAlertNotification(false), 5000);
+      } else {
+        console.log('Alert does not belong to this center, ignoring...');
+      }
+    });
+
+    // Listen for alert status changes
+    socket.on('alert_status_change', (data) => {
+      console.log('Alert status change received:', data);
+      console.log('Refreshing data due to status change...');
+      loadData(); // Refresh alerts
+    });
+
+    // Listen for alert acknowledgments
+    socket.on('alert_acknowledged', (data) => {
+      console.log('Alert acknowledged:', data);
+      console.log('Refreshing data due to acknowledgment...');
+      loadData(); // Refresh alerts
+    });
+
+    // Cleanup function
+    return () => {
+      console.log('Cleaning up WebSocket connection for center admin');
+      socket.off('emergency_alert');
+      socket.off('alert_status_change');
+      socket.off('alert_acknowledged');
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+      setSocketConnected(false);
+    };
+  }, [socket, user?.center_info?.id]);
 
   const loadData = async () => {
     try {
@@ -185,20 +241,6 @@ const AdminEmergencyAlerts: React.FC = () => {
     }
   };
 
-  const handleAssignLifeguard = async () => {
-    if (!selectedAlert || !selectedLifeguard) return;
-
-    try {
-      await apiService.assignAlert(selectedAlert.id, selectedLifeguard);
-      await loadData(); // Refresh the data
-      setAssignDialogOpen(false);
-      setSelectedAlert(null);
-      setSelectedLifeguard('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to assign lifeguard');
-    }
-  };
-
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'critical': return 'error';
@@ -230,7 +272,15 @@ const AdminEmergencyAlerts: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleString();
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   const getFilteredAlerts = () => {
@@ -278,15 +328,35 @@ const AdminEmergencyAlerts: React.FC = () => {
               </Typography>
             </Box>
           </Box>
-          <Tooltip title="Refresh Alerts">
-            <IconButton 
-              onClick={loadData}
-              disabled={refreshing}
-              sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* Connection Status Indicator */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: socketConnected ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
+                animation: socketConnected ? 'pulse 2s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%': { opacity: 1 },
+                  '50%': { opacity: 0.5 },
+                  '100%': { opacity: 1 }
+                }
+              }} />
+              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem' }}>
+                {socketConnected ? 'Live' : 'Offline'}
+              </Typography>
+            </Box>
+            <Tooltip title="Refresh Alerts">
+              <IconButton 
+                onClick={loadData}
+                disabled={refreshing}
+                sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
         
         {refreshing && <LinearProgress sx={{ bgcolor: 'rgba(255,255,255,0.3)', '& .MuiLinearProgress-bar': { bgcolor: 'white' } }} />}
@@ -295,6 +365,26 @@ const AdminEmergencyAlerts: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
+        </Alert>
+      )}
+
+      {/* New Alert Notification */}
+      {showAlertNotification && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 3 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => setShowAlertNotification(false)}>
+              Dismiss
+            </Button>
+          }
+        >
+          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+            New Emergency Alert Received!
+          </Typography>
+          <Typography variant="body2">
+            A new emergency alert has been created. Check the alerts list below for details.
+          </Typography>
         </Alert>
       )}
 
@@ -397,21 +487,6 @@ const AdminEmergencyAlerts: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Tabs */}
-      <Paper sx={{ width: '100%', mb: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
-          aria-label="alerts tabs"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab label={`All Alerts (${stats.total})`} />
-          <Tab label={`Active (${stats.active})`} />
-          <Tab label={`Responding (${stats.responding})`} />
-          <Tab label={`Resolved (${stats.resolved})`} />
-        </Tabs>
-      </Paper>
-
       {/* Filters */}
       <Card elevation={1} sx={{ mb: 3 }}>
         <CardContent sx={{ p: 3 }}>
@@ -473,85 +548,19 @@ const AdminEmergencyAlerts: React.FC = () => {
       </Card>
 
       {/* Alerts Table */}
-      <TabPanel value={tabValue} index={0}>
-        <AlertsTable 
-          alerts={filteredAlerts}
-          lifeguards={lifeguards}
-          onViewDetails={(alert) => {
-            setSelectedAlert(alert);
-            setDetailDialogOpen(true);
-          }}
-          onAssignLifeguard={(alert) => {
-            setSelectedAlert(alert);
-            setAssignDialogOpen(true);
-          }}
-          onUpdateStatus={(alert) => {
-            setSelectedAlert(alert);
-            setStatusDialogOpen(true);
-          }}
-          getAssignedLifeguardName={getAssignedLifeguardName}
-        />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={1}>
-        <AlertsTable 
-          alerts={filteredAlerts.filter(a => a.status === 'active')}
-          lifeguards={lifeguards}
-          onViewDetails={(alert) => {
-            setSelectedAlert(alert);
-            setDetailDialogOpen(true);
-          }}
-          onAssignLifeguard={(alert) => {
-            setSelectedAlert(alert);
-            setAssignDialogOpen(true);
-          }}
-          onUpdateStatus={(alert) => {
-            setSelectedAlert(alert);
-            setStatusDialogOpen(true);
-          }}
-          getAssignedLifeguardName={getAssignedLifeguardName}
-        />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={2}>
-        <AlertsTable 
-          alerts={filteredAlerts.filter(a => a.status === 'responding')}
-          lifeguards={lifeguards}
-          onViewDetails={(alert) => {
-            setSelectedAlert(alert);
-            setDetailDialogOpen(true);
-          }}
-          onAssignLifeguard={(alert) => {
-            setSelectedAlert(alert);
-            setAssignDialogOpen(true);
-          }}
-          onUpdateStatus={(alert) => {
-            setSelectedAlert(alert);
-            setStatusDialogOpen(true);
-          }}
-          getAssignedLifeguardName={getAssignedLifeguardName}
-        />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={3}>
-        <AlertsTable 
-          alerts={filteredAlerts.filter(a => a.status === 'resolved' || a.status === 'closed')}
-          lifeguards={lifeguards}
-          onViewDetails={(alert) => {
-            setSelectedAlert(alert);
-            setDetailDialogOpen(true);
-          }}
-          onAssignLifeguard={(alert) => {
-            setSelectedAlert(alert);
-            setAssignDialogOpen(true);
-          }}
-          onUpdateStatus={(alert) => {
-            setSelectedAlert(alert);
-            setStatusDialogOpen(true);
-          }}
-          getAssignedLifeguardName={getAssignedLifeguardName}
-        />
-      </TabPanel>
+      <AlertsTable 
+        alerts={filteredAlerts}
+        lifeguards={lifeguards}
+        onViewDetails={(alert) => {
+          setSelectedAlert(alert);
+          setDetailDialogOpen(true);
+        }}
+        onUpdateStatus={(alert) => {
+          setSelectedAlert(alert);
+          setStatusDialogOpen(true);
+        }}
+        getAssignedLifeguardName={getAssignedLifeguardName}
+      />
 
       {/* Alert Details Dialog */}
       <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
@@ -650,57 +659,12 @@ const AdminEmergencyAlerts: React.FC = () => {
               variant="contained"
               onClick={() => {
                 setDetailDialogOpen(false);
-                setAssignDialogOpen(true);
+                setStatusDialogOpen(true);
               }}
             >
-              Assign Lifeguard
+              Update Status
             </Button>
           )}
-        </DialogActions>
-      </Dialog>
-
-      {/* Assign Lifeguard Dialog */}
-      <Dialog open={assignDialogOpen} onClose={() => setAssignDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Assign Lifeguard
-          <IconButton
-            onClick={() => setAssignDialogOpen(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Select Lifeguard</InputLabel>
-                <Select
-                  value={selectedLifeguard}
-                  onChange={(e) => setSelectedLifeguard(e.target.value)}
-                  label="Select Lifeguard"
-                >
-                  {lifeguards.map((lifeguard) => (
-                    <MenuItem key={lifeguard.id} value={lifeguard.id}>
-                      {lifeguard.user.first_name} {lifeguard.user.last_name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAssignDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAssignLifeguard}
-            variant="contained"
-            disabled={!selectedLifeguard}
-          >
-            Assign
-          </Button>
         </DialogActions>
       </Dialog>
 
@@ -756,7 +720,6 @@ interface AlertsTableProps {
   alerts: EmergencyAlert[];
   lifeguards: Lifeguard[];
   onViewDetails: (alert: EmergencyAlert) => void;
-  onAssignLifeguard: (alert: EmergencyAlert) => void;
   onUpdateStatus: (alert: EmergencyAlert) => void;
   getAssignedLifeguardName: (lifeguardId: string) => string;
 }
@@ -765,7 +728,6 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
   alerts,
   lifeguards,
   onViewDetails,
-  onAssignLifeguard,
   onUpdateStatus,
   getAssignedLifeguardName
 }) => {
@@ -800,7 +762,15 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleString();
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   if (alerts.length === 0) {
@@ -889,17 +859,6 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
                       <ViewIcon />
                     </IconButton>
                   </Tooltip>
-                  {alert.status === 'active' && !alert.assigned_lifeguard_id && (
-                    <Tooltip title="Assign Lifeguard">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => onAssignLifeguard(alert)}
-                      >
-                        <AssignIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
                   {alert.status === 'active' && (
                     <Tooltip title="Update Status">
                       <IconButton

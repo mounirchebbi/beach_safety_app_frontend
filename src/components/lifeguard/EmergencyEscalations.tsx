@@ -48,6 +48,21 @@ import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import { EmergencyEscalation, EscalationFormData, EmergencyAlert } from '../../types';
 
+// Safe date formatting function
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    return format(date, 'MMM dd, yyyy HH:mm');
+  } catch (error) {
+    return 'Invalid Date';
+  }
+};
+
 const EmergencyEscalations: React.FC = () => {
   const { user } = useAuth();
   const [escalations, setEscalations] = useState<EmergencyEscalation[]>([]);
@@ -242,7 +257,7 @@ const EmergencyEscalations: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {format(new Date(escalation.created_at), 'MMM dd, yyyy HH:mm')}
+                            {formatDate(escalation.created_at)}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -453,7 +468,7 @@ const EmergencyEscalations: React.FC = () => {
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="text.secondary">
-                      {selectedEscalation.acknowledged_at && format(new Date(selectedEscalation.acknowledged_at), 'MMM dd, yyyy HH:mm')}
+                      {formatDate(selectedEscalation.acknowledged_at)}
                     </Typography>
                   </Grid>
                 )}
@@ -464,7 +479,7 @@ const EmergencyEscalations: React.FC = () => {
                     Created
                   </Typography>
                   <Typography variant="body1">
-                    {format(new Date(selectedEscalation.created_at), 'MMM dd, yyyy HH:mm')}
+                    {formatDate(selectedEscalation.created_at)}
                   </Typography>
                 </Grid>
 
@@ -473,7 +488,7 @@ const EmergencyEscalations: React.FC = () => {
                     Last Updated
                   </Typography>
                   <Typography variant="body1">
-                    {format(new Date(selectedEscalation.updated_at), 'MMM dd, yyyy HH:mm')}
+                    {formatDate(selectedEscalation.updated_at)}
                   </Typography>
                 </Grid>
               </Grid>

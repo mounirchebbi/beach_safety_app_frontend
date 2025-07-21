@@ -351,7 +351,14 @@ const InterCenterSupport: React.FC = () => {
 
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="caption" color="text.secondary">
-            Created: {new Date(request.created_at).toLocaleString()}
+            Created: {(() => {
+              try {
+                const date = new Date(request.created_at);
+                return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+              } catch (error) {
+                return 'Invalid Date';
+              }
+            })()}
           </Typography>
           
           <Box display="flex" gap={1}>
@@ -657,7 +664,14 @@ const InterCenterSupport: React.FC = () => {
                     Created At
                   </Typography>
                   <Typography variant="body2">
-                    {new Date(selectedRequest.created_at).toLocaleString()}
+                    {(() => {
+                      try {
+                        const date = new Date(selectedRequest.created_at);
+                        return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+                      } catch (error) {
+                        return 'Invalid Date';
+                      }
+                    })()}
                   </Typography>
                 </Grid>
 
@@ -667,7 +681,14 @@ const InterCenterSupport: React.FC = () => {
                       Acknowledged At
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(selectedRequest.acknowledged_at).toLocaleString()}
+                      {(() => {
+                        try {
+                          const date = new Date(selectedRequest.acknowledged_at);
+                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+                        } catch (error) {
+                          return 'Invalid Date';
+                        }
+                      })()}
                     </Typography>
                   </Grid>
                 )}
@@ -678,7 +699,14 @@ const InterCenterSupport: React.FC = () => {
                       Resolved At
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(selectedRequest.resolved_at).toLocaleString()}
+                      {(() => {
+                        try {
+                          const date = new Date(selectedRequest.resolved_at);
+                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+                        } catch (error) {
+                          return 'Invalid Date';
+                        }
+                      })()}
                     </Typography>
                   </Grid>
                 )}

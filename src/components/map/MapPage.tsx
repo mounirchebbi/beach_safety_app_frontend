@@ -291,13 +291,21 @@ const MapPage: React.FC = () => {
   };
 
   const formatTimeAgo = (date: Date) => {
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    try {
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      const now = new Date();
+      const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+      
+      if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+      if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+      return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   return (
@@ -443,7 +451,14 @@ const MapPage: React.FC = () => {
                             {alert.description}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {formatTimeAgo(new Date(alert.created_at))}
+                            {(() => {
+                              try {
+                                const date = new Date(alert.created_at);
+                                return isNaN(date.getTime()) ? 'Invalid Date' : formatTimeAgo(date);
+                              } catch (error) {
+                                return 'Invalid Date';
+                              }
+                            })()}
                           </Typography>
                         </Box>
                       }

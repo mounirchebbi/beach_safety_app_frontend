@@ -50,6 +50,21 @@ import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import { IncidentReport } from '../../types';
 
+// Safe date formatting function
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    return format(date, 'MMM dd, yyyy HH:mm');
+  } catch (error) {
+    return 'Invalid Date';
+  }
+};
+
 const IncidentReports: React.FC = () => {
   const { user } = useAuth();
   const [reports, setReports] = useState<IncidentReport[]>([]);
@@ -245,7 +260,7 @@ const IncidentReports: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {format(new Date(report.created_at), 'MMM dd, yyyy HH:mm')}
+                            {formatDate(report.created_at)}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -401,7 +416,7 @@ const IncidentReports: React.FC = () => {
                     Created
                   </Typography>
                   <Typography variant="body1">
-                    {format(new Date(selectedReport.created_at), 'MMM dd, yyyy HH:mm')}
+                    {formatDate(selectedReport.created_at)}
                   </Typography>
                 </Grid>
 
@@ -410,7 +425,7 @@ const IncidentReports: React.FC = () => {
                     Last Updated
                   </Typography>
                   <Typography variant="body1">
-                    {format(new Date(selectedReport.updated_at), 'MMM dd, yyyy HH:mm')}
+                    {formatDate(selectedReport.updated_at)}
                   </Typography>
                 </Grid>
               </Grid>

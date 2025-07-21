@@ -147,6 +147,13 @@ class SocketService {
     }
   }
 
+  // Listen for safety zone updates
+  onSafetyZoneUpdated(callback: (data: any) => void): void {
+    if (this.socket) {
+      this.socket.on('safety_zone_updated', callback);
+    }
+  }
+
   // Listen for emergency broadcasts
   onEmergencyBroadcast(callback: (data: any) => void): void {
     if (this.socket) {
@@ -201,6 +208,12 @@ class SocketService {
   offSafetyFlagUpdated(): void {
     if (this.socket) {
       this.socket.off('safety_flag_updated');
+    }
+  }
+
+  offSafetyZoneUpdated(): void {
+    if (this.socket) {
+      this.socket.off('safety_zone_updated');
     }
   }
 

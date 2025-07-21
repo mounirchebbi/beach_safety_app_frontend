@@ -1009,7 +1009,14 @@ const BeachMap: React.FC<BeachMapProps> = ({
                       letterSpacing: '0.5px'
                     }}
                   >
-                    {new Date(alert.created_at).toLocaleString()}
+                    {(() => {
+                      try {
+                        const date = new Date(alert.created_at);
+                        return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+                      } catch (error) {
+                        return 'Invalid Date';
+                      }
+                    })()}
                   </Typography>
                 </Box>
               </Box>

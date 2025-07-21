@@ -18,6 +18,7 @@ import {
   Email,
   Lock,
   BeachAccess,
+  Home,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -99,8 +100,27 @@ const LoginPage: React.FC = () => {
             p: 3,
             textAlign: 'center',
             color: 'white',
+            position: 'relative',
           }}
         >
+          {/* Home Button */}
+          <IconButton
+            onClick={() => navigate('/')}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              color: 'white',
+              bgcolor: 'rgba(255,255,255,0.1)',
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.2)',
+              },
+            }}
+            title="Go to Homepage"
+          >
+            <Home />
+          </IconButton>
+
           <BeachAccess sx={{ fontSize: 48, mb: 2 }} />
           <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
             Beach Safety
@@ -219,6 +239,6 @@ const LoginPage: React.FC = () => {
       </Paper>
     </Box>
   );
-};
-
+  };
+  
 export default LoginPage; 

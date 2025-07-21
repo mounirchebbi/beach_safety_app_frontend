@@ -364,10 +364,11 @@ const EmergencyAlerts: React.FC = () => {
   const [escalationDialogOpen, setEscalationDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [escalationFormData, setEscalationFormData] = useState<EscalationFormData>({
-    title: '',
-    description: '',
+    alert_id: '',
+    escalation_type: 'backup_request',
     priority: 'medium',
-    request_type: 'personnel_support'
+    description: '',
+    requested_resources: {}
   });
   const [refreshing, setRefreshing] = useState(false);
   const [newAlertsCount, setNewAlertsCount] = useState(0);
@@ -576,21 +577,38 @@ const EmergencyAlerts: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleString();
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   const formatTimeAgo = (dateString: string) => {
-    const now = new Date();
-    const alertTime = new Date(dateString);
-    const timeDiff = now.getTime() - alertTime.getTime();
-    const minutesAgo = Math.floor(timeDiff / (1000 * 60));
-    
-    if (minutesAgo < 1) return 'Just now';
-    if (minutesAgo < 60) return `${minutesAgo}m ago`;
-    const hoursAgo = Math.floor(minutesAgo / 60);
-    if (hoursAgo < 24) return `${hoursAgo}h ago`;
-    const daysAgo = Math.floor(hoursAgo / 24);
-    return `${daysAgo}d ago`;
+    try {
+      const now = new Date();
+      const alertTime = new Date(dateString);
+      
+      if (isNaN(alertTime.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      const timeDiff = now.getTime() - alertTime.getTime();
+      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+      
+      if (minutesAgo < 1) return 'Just now';
+      if (minutesAgo < 60) return `${minutesAgo}m ago`;
+      const hoursAgo = Math.floor(minutesAgo / 60);
+      if (hoursAgo < 24) return `${hoursAgo}h ago`;
+      const daysAgo = Math.floor(hoursAgo / 24);
+      return `${daysAgo}d ago`;
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   // Sort alerts by selected order (date or severity)

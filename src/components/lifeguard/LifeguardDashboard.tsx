@@ -261,25 +261,42 @@ const LifeguardDashboard: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString([], {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   const getTimeRemaining = (endTime: string) => {
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end.getTime() - now.getTime();
-    
-    if (diff <= 0) return 'Shift ended';
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) return `${hours}h ${minutes}m remaining`;
-    return `${minutes}m remaining`;
+    try {
+      const now = new Date();
+      const end = new Date(endTime);
+      
+      if (isNaN(end.getTime())) {
+        return 'Invalid Time';
+      }
+      
+      const diff = end.getTime() - now.getTime();
+      
+      if (diff <= 0) return 'Shift ended';
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (hours > 0) return `${hours}h ${minutes}m remaining`;
+      return `${minutes}m remaining`;
+    } catch (error) {
+      return 'Invalid Time';
+    }
   };
 
   if (loading) {
@@ -476,13 +493,23 @@ const LifeguardDashboard: React.FC = () => {
 
         {/* Emergency Alerts - Critical Information */}
         <Grid item xs={12} lg={4}>
-          <Card elevation={2} sx={{ 
-            height: '100%',
-            background: stats.activeAlerts > 0 ? 'linear-gradient(135deg, #ff4444 0%, #ff6b6b 100%)' : 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
-            color: 'white',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              height: '100%',
+              background: stats.activeAlerts > 0 ? 'linear-gradient(135deg, #ff4444 0%, #ff6b6b 100%)' : 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: 4
+              }
+            }}
+            onClick={() => navigate('/lifeguard/alerts')}
+          >
             {/* Real-time indicator */}
             <Box sx={{
               position: 'absolute',
@@ -539,43 +566,16 @@ const LifeguardDashboard: React.FC = () => {
                   {stats.activeAlerts === 1 ? 'Active Alert' : 'Active Alerts'}
                 </Typography>
                 
-                <Stack spacing={1} sx={{ width: '100%' }}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<WarningIcon />}
-                    onClick={() => navigate('/lifeguard/alerts')}
-                    sx={{ 
-                      bgcolor: 'white', 
-                      color: stats.activeAlerts > 0 ? 'error.main' : 'success.main',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
-                    }}
-                  >
-                    {stats.activeAlerts > 0 ? 'Respond Now' : 'View Alerts'}
-                  </Button>
-                  
-                                    <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<RefreshIcon />}
-                    onClick={updateActiveAlertsCount}
-                    disabled={refreshing}
-                    sx={{ 
-                      borderColor: 'rgba(255,255,255,0.5)',
-                      color: 'rgba(255,255,255,0.9)',
-                      '&:hover': { 
-                        borderColor: 'white',
-                        bgcolor: 'rgba(255,255,255,0.1)'
-                      }
-                    }}
-                  >
-                    {refreshing ? 'Updating...' : 'Refresh'}
-                  </Button>
-                  
-
-                  
-
-                </Stack>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    Click to view all emergency alerts
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
           </Card>
