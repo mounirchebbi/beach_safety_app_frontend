@@ -797,7 +797,7 @@ class ApiService {
   }
 
   async resetUserPassword(id: string, newPassword: string): Promise<void> {
-    await this.api.put(`/api/v1/users/${id}/reset-password`, { new_password: newPassword });
+    await this.api.post(`/api/v1/auth/users/${id}/reset-password`, { new_password: newPassword });
   }
 
   // Center location check-in settings

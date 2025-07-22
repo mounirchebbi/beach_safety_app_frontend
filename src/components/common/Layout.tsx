@@ -27,16 +27,17 @@ import {
   Report,
   AccountCircle,
   Logout,
-  BeachAccess,
   LocationOn,
   Security,
   AdminPanelSettings,
   SystemUpdate,
   Assessment,
 } from '@mui/icons-material';
+import { ReactComponent as AppLogo } from '../../logo.svg';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import NotificationSystem from './NotificationSystem';
+import { styled } from '@mui/material/styles';
 
 const drawerWidth = 280;
 
@@ -86,7 +87,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           { text: 'Lifeguard Management', icon: <People />, path: '/admin/lifeguards' },
           { text: 'Shift Scheduling', icon: <Schedule />, path: '/admin/shifts' },
           { text: 'Safety Flags Management', icon: <Security />, path: '/admin/safety' },
-          { text: 'Zones Management', icon: <BeachAccess />, path: '/admin/safety-zones' },
+          { text: 'Zones Management', icon: <LocationOn />, path: '/admin/safety-zones' },
           { text: 'Alerts Management', icon: <Warning />, path: '/admin/alerts' },
           { text: 'Incident Reports', icon: <Report />, path: '/admin/reports' },
           { text: 'Emergency Escalations', icon: <Warning />, path: '/admin/escalations' },
@@ -124,7 +125,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <Box>
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <BeachAccess sx={{ color: 'primary.main', fontSize: 32 }} />
+          <AppLogo style={{ width: 32, height: 32, marginRight: 4 }} />
           <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600 }}>
             Beach Safety
           </Typography>
@@ -214,11 +215,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <MenuIcon />
           </IconButton>
-          
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {navigationItems.find(item => item.path === location.pathname)?.text || 'Beach Safety App'}
           </Typography>
-          
           {/* Profile Menu - Always show for logout access */}
           <IconButton
             color="inherit"

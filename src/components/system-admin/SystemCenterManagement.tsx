@@ -122,14 +122,9 @@ function TabPanel(props: TabPanelProps) {
 const SystemCenterManagement: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [centerDialogOpen, setCenterDialogOpen] = useState(false);
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [centerPage, setCenterPage] = useState(1);
-  const [userPage, setUserPage] = useState(1);
-  const [userFilters, setUserFilters] = useState({
-    role: '',
-    center_id: '',
+  const [centerFilters, setCenterFilters] = useState({
     search: ''
   });
 
@@ -146,27 +141,10 @@ const SystemCenterManagement: React.FC = () => {
     location: { lat: 0, lng: 0 }
   });
 
-  // User form state
-  const [userForm, setUserForm] = useState({
-    email: '',
-    password: '',
-    role: 'center_admin' as 'system_admin' | 'center_admin' | 'lifeguard',
-    first_name: '',
-    last_name: '',
-    phone: '',
-    center_id: '',
-    is_active: true
-  });
-
   // Queries
   const { data: centersData, isLoading: centersLoading, error: centersError } = useQuery({
     queryKey: ['centers'],
     queryFn: () => api.getCenters()
-  });
-
-  const { data: usersData, isLoading: usersLoading, error: usersError } = useQuery({
-    queryKey: ['users', userPage, userFilters],
-    queryFn: () => api.getAllUsers(userPage, 30, userFilters)
   });
 
   // Mutations
@@ -195,38 +173,6 @@ const SystemCenterManagement: React.FC = () => {
     }
   });
 
-  const createUserMutation = useMutation({
-    mutationFn: (data: any) => api.createUser(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setUserDialogOpen(false);
-      resetUserForm();
-    }
-  });
-
-  const updateUserMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.updateUser(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setUserDialogOpen(false);
-      resetUserForm();
-    }
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: (id: string) => api.deleteUser(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    }
-  });
-
-  const resetPasswordMutation = useMutation({
-    mutationFn: ({ id, password }: { id: string; password: string }) => api.resetUserPassword(id, password),
-    onSuccess: () => {
-      alert('Password reset successfully');
-    }
-  });
-
   const resetCenterForm = () => {
     setCenterForm({
       name: '',
@@ -240,36 +186,12 @@ const SystemCenterManagement: React.FC = () => {
     setSelectedCenter(null);
   };
 
-  const resetUserForm = () => {
-    setUserForm({
-      email: '',
-      password: '',
-      role: 'center_admin',
-      first_name: '',
-      last_name: '',
-      phone: '',
-      center_id: '',
-      is_active: true
-    });
-    setSelectedUser(null);
-  };
-
   const handleCenterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedCenter) {
       updateCenterMutation.mutate({ id: selectedCenter.id, data: centerForm });
     } else {
       createCenterMutation.mutate(centerForm);
-    }
-  };
-
-  const handleUserSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedUser) {
-      const { password, ...updateData } = userForm;
-      updateUserMutation.mutate({ id: selectedUser.id, data: updateData });
-    } else {
-      createUserMutation.mutate(userForm);
     }
   };
 
@@ -297,46 +219,11 @@ const SystemCenterManagement: React.FC = () => {
     setCenterDialogOpen(true);
   };
 
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setUserForm({
-      email: user.email,
-      password: '',
-      role: user.role,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      phone: user.phone || '',
-      center_id: user.center_id || '',
-      is_active: user.is_active
-    });
-    setUserDialogOpen(true);
-  };
-
-  const handleResetPassword = (userId: string) => {
-    const newPassword = prompt('Enter new password (minimum 6 characters):');
-    if (newPassword && newPassword.length >= 6) {
-      resetPasswordMutation.mutate({ id: userId, password: newPassword });
-    } else if (newPassword) {
-      alert('Password must be at least 6 characters long');
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'system_admin': return 'error';
-      case 'center_admin': return 'primary';
-      case 'lifeguard': return 'success';
-      default: return 'default';
-    }
-  };
-
   const getStatusColor = (isActive: boolean) => {
     return isActive ? 'success' : 'error';
   };
 
   const [deleteCenterId, setDeleteCenterId] = useState<string | null>(null);
-  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
-
   const [mapCenter, setMapCenter] = useState<[number, number]>([36.8065, 10.1815]); // Default to Tunisia
 
   const handleLocationSelect = (lat: number, lng: number) => {
@@ -367,6 +254,126 @@ const SystemCenterManagement: React.FC = () => {
     }
   };
 
+  // 1. Add the Users tab to the Tabs component:
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userPage, setUserPage] = useState(1);
+  const [userFilters, setUserFilters] = useState({
+    search: '',
+    role: '',
+    center_id: ''
+  });
+
+  // User form state
+  const [userForm, setUserForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    role: 'lifeguard',
+    center_id: '',
+    password: '',
+    is_active: true
+  });
+
+  // Queries
+  const { data: usersData = { data: [], pagination: { page: 1, limit: 30, total: 0, pages: 1 } }, isLoading: usersLoading, error: usersError } = useQuery({
+    queryKey: ['users', userPage, userFilters],
+    queryFn: () => api.getAllUsers(userPage, 30, userFilters)
+  });
+
+  // Mutations
+  const createUserMutation = useMutation({
+    mutationFn: (data: any) => api.createUser(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setUserDialogOpen(false);
+      resetUserForm();
+    }
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.updateUser(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setUserDialogOpen(false);
+      resetUserForm();
+    }
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: string) => api.deleteUser(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+  });
+
+  const resetUserForm = () => {
+    setUserForm({
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      role: 'lifeguard',
+      center_id: '',
+      password: '',
+      is_active: true
+    });
+    setSelectedUser(null);
+  };
+
+  const handleUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedUser) {
+      updateUserMutation.mutate({ id: selectedUser.id, data: userForm });
+    } else {
+      createUserMutation.mutate(userForm);
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    setSelectedUser(user);
+    setUserForm({
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      center_id: user.center_id || '',
+      password: '', // Password is not editable
+      is_active: user.is_active
+    });
+    setUserDialogOpen(true);
+  };
+
+  const handleResetPassword = (id: string) => {
+    const newPassword = window.prompt('Enter a new password for this user:');
+    if (!newPassword) return;
+    if (window.confirm('Are you sure you want to reset the password for this user?')) {
+      api.resetUserPassword(id, newPassword).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['users'] });
+        alert('Password reset successful!');
+      }).catch(err => {
+        alert(`Error resetting password: ${err.message}`);
+      });
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'system_admin':
+        return 'primary';
+      case 'center_admin':
+        return 'info';
+      case 'lifeguard':
+        return 'success';
+      default:
+        return 'default';
+    }
+  };
+
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3 }}>
@@ -382,11 +389,7 @@ const SystemCenterManagement: React.FC = () => {
                 label="Centers" 
                 iconPosition="start"
               />
-              <Tab 
-                icon={<PersonIcon />} 
-                label="Users" 
-                iconPosition="start"
-              />
+              <Tab icon={<PersonIcon />} label="Users" iconPosition="start" />
             </Tabs>
           </Box>
 
@@ -501,7 +504,6 @@ const SystemCenterManagement: React.FC = () => {
                 Add User
               </Button>
             </Box>
-
             {/* Filters */}
             <Accordion sx={{ mb: 2 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -554,13 +556,11 @@ const SystemCenterManagement: React.FC = () => {
                 </Grid>
               </AccordionDetails>
             </Accordion>
-
             {usersError && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 Error loading users: {usersError.message}
               </Alert>
             )}
-
             {usersLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                 <CircularProgress />
@@ -580,7 +580,7 @@ const SystemCenterManagement: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {usersData?.data?.map((user) => (
+                      {usersData.data?.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>{`${user.first_name} ${user.last_name}`}</TableCell>
                           <TableCell>{user.email}</TableCell>
@@ -611,10 +611,7 @@ const SystemCenterManagement: React.FC = () => {
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Delete User">
-                              <IconButton 
-                                onClick={() => setDeleteUserId(user.id)}
-                                color="error"
-                              >
+                              <IconButton onClick={() => setDeleteUserId(user.id)} color="error">
                                 <DeleteIcon />
                               </IconButton>
                             </Tooltip>
@@ -624,17 +621,6 @@ const SystemCenterManagement: React.FC = () => {
                     </TableBody>
                   </Table>
                 </TableContainer>
-
-                {usersData?.pagination && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                    <Pagination
-                      count={usersData.pagination.pages}
-                      page={userPage}
-                      onChange={(_, page) => setUserPage(page)}
-                      color="primary"
-                    />
-                  </Box>
-                )}
                 {/* User Delete Confirmation Dialog */}
                 <Dialog open={!!deleteUserId} onClose={() => setDeleteUserId(null)}>
                   <DialogTitle>Confirm Delete</DialogTitle>
@@ -643,7 +629,7 @@ const SystemCenterManagement: React.FC = () => {
                   </DialogContent>
                   <DialogActions>
                     <Button onClick={() => setDeleteUserId(null)}>Cancel</Button>
-                    <Button 
+                    <Button
                       onClick={() => {
                         if (deleteUserId) deleteUserMutation.mutate(deleteUserId);
                         setDeleteUserId(null);
@@ -654,6 +640,120 @@ const SystemCenterManagement: React.FC = () => {
                       Delete
                     </Button>
                   </DialogActions>
+                </Dialog>
+                {/* User Dialog */}
+                <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="md" fullWidth>
+                  <DialogTitle>{selectedUser ? 'Edit User' : 'Add New User'}</DialogTitle>
+                  <form onSubmit={handleUserSubmit}>
+                    <DialogContent>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="First Name"
+                            value={userForm.first_name}
+                            onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })}
+                            required
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Last Name"
+                            value={userForm.last_name}
+                            onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })}
+                            required
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Email"
+                            type="email"
+                            value={userForm.email}
+                            onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                            required
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Phone"
+                            value={userForm.phone}
+                            onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <FormControl fullWidth required>
+                            <InputLabel>Role</InputLabel>
+                            <Select
+                              value={userForm.role}
+                              onChange={(e) => setUserForm({ ...userForm, role: e.target.value as any })}
+                              label="Role"
+                            >
+                              <MenuItem value="system_admin">System Admin</MenuItem>
+                              <MenuItem value="center_admin">Center Admin</MenuItem>
+                              <MenuItem value="lifeguard">Lifeguard</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <FormControl fullWidth>
+                            <InputLabel>Center</InputLabel>
+                            <Select
+                              value={userForm.center_id}
+                              onChange={(e) => setUserForm({ ...userForm, center_id: e.target.value })}
+                              label="Center"
+                            >
+                              <MenuItem value="">No Center</MenuItem>
+                              {centersData?.map((center) => (
+                                <MenuItem key={center.id} value={center.id}>
+                                  {center.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        {!selectedUser && (
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              fullWidth
+                              label="Password"
+                              type="password"
+                              value={userForm.password}
+                              onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                              required
+                            />
+                          </Grid>
+                        )}
+                        <Grid item xs={12} sm={6}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={userForm.is_active}
+                                onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })}
+                              />
+                            }
+                            label="Active"
+                          />
+                        </Grid>
+                      </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={createUserMutation.isPending || updateUserMutation.isPending}
+                      >
+                        {createUserMutation.isPending || updateUserMutation.isPending ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          selectedUser ? 'Update' : 'Create'
+                        )}
+                      </Button>
+                    </DialogActions>
+                  </form>
                 </Dialog>
               </>
             )}
@@ -811,121 +911,6 @@ const SystemCenterManagement: React.FC = () => {
                 <CircularProgress size={20} />
               ) : (
                 selectedCenter ? 'Update' : 'Create'
-              )}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-
-      {/* User Dialog */}
-      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{selectedUser ? 'Edit User' : 'Add New User'}</DialogTitle>
-        <form onSubmit={handleUserSubmit}>
-          <DialogContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  value={userForm.first_name}
-                  onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  value={userForm.last_name}
-                  onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  value={userForm.email}
-                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Phone"
-                  value={userForm.phone}
-                  onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Role</InputLabel>
-                  <Select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value as any })}
-                    label="Role"
-                  >
-                    <MenuItem value="system_admin">System Admin</MenuItem>
-                    <MenuItem value="center_admin">Center Admin</MenuItem>
-                    <MenuItem value="lifeguard">Lifeguard</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Center</InputLabel>
-                  <Select
-                    value={userForm.center_id}
-                    onChange={(e) => setUserForm({ ...userForm, center_id: e.target.value })}
-                    label="Center"
-                  >
-                    <MenuItem value="">No Center</MenuItem>
-                    {centersData?.map((center) => (
-                      <MenuItem key={center.id} value={center.id}>
-                        {center.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              {!selectedUser && (
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Password"
-                    type="password"
-                    value={userForm.password}
-                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                    required
-                  />
-                </Grid>
-              )}
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={userForm.is_active}
-                      onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })}
-                    />
-                  }
-                  label="Active"
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
-            <Button 
-              type="submit" 
-              variant="contained"
-              disabled={createUserMutation.isPending || updateUserMutation.isPending}
-            >
-              {createUserMutation.isPending || updateUserMutation.isPending ? (
-                <CircularProgress size={20} />
-              ) : (
-                selectedUser ? 'Update' : 'Create'
               )}
             </Button>
           </DialogActions>

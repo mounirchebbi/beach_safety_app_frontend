@@ -20,6 +20,7 @@ import {
   BeachAccess,
   Home,
 } from '@mui/icons-material';
+import { ReactComponent as AppLogo } from '../../logo.svg';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -121,7 +122,7 @@ const LoginPage: React.FC = () => {
             <Home />
           </IconButton>
 
-          <BeachAccess sx={{ fontSize: 48, mb: 2 }} />
+          <AppLogo style={{ width: 48, height: 48, marginBottom: 16 }} />
           <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
             Beach Safety
           </Typography>
