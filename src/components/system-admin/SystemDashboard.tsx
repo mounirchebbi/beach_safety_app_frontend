@@ -132,14 +132,6 @@ const SystemDashboard: React.FC = () => {
       badge: systemStats.totalUsers
     },
     {
-      title: 'Flag Management',
-      description: 'Monitor safety flags across centers',
-      icon: <FlagIcon />,
-      route: '/system/flags',
-      color: 'warning',
-      badge: systemStats.flagsNeedingAttention
-    },
-    {
       title: 'System Reports',
       description: 'View system-wide analytics',
       icon: <AssessmentIcon />,
@@ -213,8 +205,8 @@ const SystemDashboard: React.FC = () => {
       ) : (
         <>
           {/* System Overview Cards */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={3}>
+          <Grid container spacing={4} justifyContent="center" alignItems="stretch" sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={4} md={4}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -240,7 +232,7 @@ const SystemDashboard: React.FC = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={4} md={4}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -272,42 +264,7 @@ const SystemDashboard: React.FC = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ height: '100%' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                      <FlagIcon />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                        {systemStats.totalFlags}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Safety Flags
-                      </Typography>
-                    </Box>
-                  </Box>
-                  {systemStats.flagsNeedingAttention > 0 ? (
-                    <Chip
-                      label={`${systemStats.flagsNeedingAttention} Need Attention`}
-                      color="warning"
-                      size="small"
-                      icon={<WarningIcon />}
-                    />
-                  ) : (
-                    <Chip
-                      label="All Clear"
-                      color="success"
-                      size="small"
-                      icon={<CheckCircleIcon />}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={4} md={4}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -461,18 +418,6 @@ const SystemDashboard: React.FC = () => {
                       <ListItemText 
                         primary={`${systemStats.totalUsers} Users Registered`}
                         secondary={`${systemStats.activeUsers} currently active`}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <FlagIcon color="warning" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={`${systemStats.totalFlags} Safety Flags Active`}
-                        secondary={systemStats.flagsNeedingAttention > 0 
-                          ? `${systemStats.flagsNeedingAttention} require attention`
-                          : "All flags in good standing"
-                        }
                       />
                     </ListItem>
                   </List>

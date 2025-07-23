@@ -166,25 +166,6 @@ const NotificationSystem: React.FC = () => {
         setOpen(true);
       };
 
-      // Listen for test emergency alerts (for debugging)
-      const handleTestEmergencyAlert = (data: any) => {
-        console.log('NotificationSystem: Test emergency alert received:', data);
-        const notification: Notification = {
-          id: `test_emergency_${data.id}_${Date.now()}`,
-          type: 'emergency_alert',
-          title: 'Test Emergency Alert',
-          message: `TEST ${data.alert_type.toUpperCase()} alert - ${data.severity} severity`,
-          severity: getSeveritySeverity(data.severity),
-          data,
-          timestamp: data.timestamp,
-          read: false
-        };
-
-        setNotifications(prev => [notification, ...prev.slice(0, 9)]);
-        setCurrentNotification(notification);
-        setOpen(true);
-      };
-
       // Set up all event listeners
       socket.on('new_escalation', handleNewEscalation);
       socket.on('escalation_status_updated', handleEscalationStatusUpdate);
@@ -192,7 +173,6 @@ const NotificationSystem: React.FC = () => {
       socket.on('inter_center_support_status_updated', handleInterCenterSupportStatusUpdate);
       socket.on('emergency_alert', handleEmergencyAlert);
       socket.on('alert_status_change', handleAlertStatusChange);
-      socket.on('test_emergency_alert', handleTestEmergencyAlert);
 
       // Return cleanup function
       return () => {
@@ -203,7 +183,6 @@ const NotificationSystem: React.FC = () => {
         socket.off('inter_center_support_status_updated', handleInterCenterSupportStatusUpdate);
         socket.off('emergency_alert', handleEmergencyAlert);
         socket.off('alert_status_change', handleAlertStatusChange);
-        socket.off('test_emergency_alert', handleTestEmergencyAlert);
       };
     };
 

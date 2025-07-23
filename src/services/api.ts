@@ -851,6 +851,10 @@ class ApiService {
     const response = await this.api.post(`/api/v1/safety/centers/${centerId}/auto-update`);
     return response.data;
   }
+
+  async setCenterRateLimit(centerId: string, enabled: boolean): Promise<void> {
+    await this.api.patch(`/api/v1/centers/${centerId}/rate-limit`, { enabled });
+  }
 }
 
 export const apiService = new ApiService();

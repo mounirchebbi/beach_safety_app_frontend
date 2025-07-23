@@ -12,7 +12,9 @@ import {
   Divider,
   Stack,
   IconButton,
-  Tooltip
+  Tooltip,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -21,7 +23,8 @@ import {
   Business as BusinessIcon,
   Phone as PhoneIcon,
   Email as EmailIcon,
-  LocationOn as LocationIcon
+  LocationOn as LocationIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import apiService from '../../services/api';
@@ -299,7 +302,6 @@ const CenterInformationForm: React.FC<CenterInformationFormProps> = ({
               />
             </Stack>
           </Grid>
-
 
         </Grid>
 

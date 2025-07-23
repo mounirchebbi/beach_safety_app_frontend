@@ -17,7 +17,9 @@ import {
   Avatar,
   Badge,
   LinearProgress,
-  Fade
+  Fade,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
   Business as BusinessIcon,
@@ -84,20 +86,19 @@ const CenterDashboard: React.FC = () => {
   const [updatingStats, setUpdatingStats] = useState(false);
   const [showAlertNotification, setShowAlertNotification] = useState(false);
   const [safetyZones, setSafetyZones] = useState<SafetyZone[]>([]);
+  const [rateLimitEnabled, setRateLimitEnabled] = useState<boolean | null>(null);
+  const [rateLimitSaving, setRateLimitSaving] = useState(false);
 
   // Efficient function to update just the alerts count
   const updateAlertsCount = useCallback(async (centerId: string | undefined) => {
     if (!centerId) return;
     
     try {
-      console.log('Updating alerts count for center:', centerId);
       setUpdatingStats(true);
       
       const alerts = await apiService.getAlerts();
       const centerAlerts = alerts.filter((alert: EmergencyAlert) => alert.center_id === centerId);
       const activeAlerts = centerAlerts.filter((alert: EmergencyAlert) => alert.status === 'active').length;
-      
-      console.log('New active alerts count:', activeAlerts);
       
       setStats(prev => ({
         ...prev,
@@ -115,14 +116,11 @@ const CenterDashboard: React.FC = () => {
     if (!centerId) return;
     
     try {
-      console.log('Updating lifeguard stats for center:', centerId);
       setUpdatingStats(true);
       
       const lifeguards = await apiService.getLifeguards();
       const centerLifeguards = lifeguards.filter((lg: any) => lg.center_id === centerId);
       const activeLifeguards = centerLifeguards.filter((lg: any) => lg.user?.is_active).length;
-      
-      console.log('New active lifeguards count:', activeLifeguards);
       
       setStats(prev => ({
         ...prev,
@@ -141,14 +139,11 @@ const CenterDashboard: React.FC = () => {
     if (!centerId) return;
     
     try {
-      console.log('Updating shift stats for center:', centerId);
       setUpdatingStats(true);
       
       const shifts = await apiService.getShifts();
       const centerShifts = shifts.filter((shift: any) => shift.center_id === centerId);
       const activeShifts = centerShifts.filter((shift: any) => shift.status === 'active').length;
-      
-      console.log('New active shifts count:', activeShifts);
       
       setStats(prev => ({
         ...prev,
@@ -167,7 +162,6 @@ const CenterDashboard: React.FC = () => {
     if (!centerId) return;
     
     try {
-      console.log('Updating weather stats for center:', centerId);
       setUpdatingStats(true);
       
       const lastWeatherUpdate = await apiService.getCurrentWeatherForCenter(centerId);
@@ -188,7 +182,6 @@ const CenterDashboard: React.FC = () => {
     if (!centerId) return;
     
     try {
-      console.log('Updating safety flag stats for center:', centerId);
       setUpdatingStats(true);
       
       const flagHistory = await apiService.getSafetyFlagHistory(centerId, 1, 50);
@@ -221,23 +214,17 @@ const CenterDashboard: React.FC = () => {
   // WebSocket connection and real-time updates
   useEffect(() => {
     if (!user?.center_info?.id) {
-      console.log('WebSocket setup skipped - user not available');
       return;
     }
 
-    console.log('Setting up WebSocket connection for center dashboard:', user.center_info.id);
-    
     try {
       const socket = socketService.connect();
-      console.log('Socket service connected, socket object:', socket);
       
       // Join center room for real-time updates
       socketService.joinCenter(user.center_info.id);
-      console.log('Joined center room:', user.center_info.id);
       
       // Listen for emergency alerts
       socketService.onEmergencyAlert((data) => {
-        console.log('Emergency alert received:', data);
         updateAlertsCount(user?.center_info?.id);
         setShowAlertNotification(true);
         // Auto-hide notification after 5 seconds
@@ -246,78 +233,55 @@ const CenterDashboard: React.FC = () => {
 
       // Listen for alert status changes
       socketService.onAlertStatusChange((data) => {
-        console.log('Alert status change received:', data);
         updateAlertsCount(user?.center_info?.id);
       });
 
       // Listen for weather updates
       socketService.onWeatherUpdate((data) => {
-        console.log('Weather update received:', data);
         if (data.center_id === user?.center_info?.id) {
-          console.log('Weather update for this center, updating stats...');
           updateWeatherStats(user?.center_info?.id);
         }
       });
 
       // Listen for safety flag updates
       socketService.onSafetyFlagUpdated((data) => {
-        console.log('Safety flag update received:', data);
         if (data.centerId === user?.center_info?.id) {
-          console.log('Safety flag update for this center, updating stats...');
           updateSafetyFlagStats(user?.center_info?.id);
         }
       });
 
       // Listen for safety zone updates
       socketService.onSafetyZoneUpdated((data) => {
-        console.log('Safety zone update received:', data);
         if (data.centerId === user?.center_info?.id) {
-          console.log('Safety zone update for this center, updating zones...');
           // Assuming data.zones is an array of SafetyZone objects
           setSafetyZones(data.zones);
         }
       });
 
-      // Listen for test emergency alerts (for debugging)
-      socket.on('test_emergency_alert', (data) => {
-        console.log('Test emergency alert received in dashboard:', data);
-        if (data.center_id === user?.center_info?.id) {
-          console.log('Test alert belongs to this center, updating alerts count...');
-          updateAlertsCount(user?.center_info?.id);
-        }
-      });
-
       // Check socket connection status
       if (socket.connected) {
-        console.log('Socket connected successfully');
         setSocketConnected(true);
       } else {
-        console.log('Socket not connected, waiting for connection...');
         socket.on('connect', () => {
-          console.log('Socket connected after waiting');
           setSocketConnected(true);
         });
       }
 
       // Add connection event listeners for debugging
       socket.on('connect', () => {
-        console.log('Socket connected event fired');
         setSocketConnected(true);
       });
 
       socket.on('disconnect', (reason) => {
-        console.log('Socket disconnected:', reason);
         setSocketConnected(false);
       });
 
       socket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
         setSocketConnected(false);
       });
 
       // Cleanup function
       return () => {
-        console.log('Cleaning up WebSocket connection for center dashboard');
         socketService.offEmergencyAlert();
         socketService.offAlertStatusChange();
         socketService.offWeatherUpdate();
@@ -337,7 +301,6 @@ const CenterDashboard: React.FC = () => {
   useEffect(() => {
     if (user?.center_info?.id) {
       const interval = setInterval(() => {
-        console.log('Periodic refresh of alerts count');
         updateAlertsCount(user?.center_info?.id);
       }, 30000); // 30 seconds
 
@@ -455,6 +418,32 @@ const CenterDashboard: React.FC = () => {
     }
   };
 
+  // Fetch current rate limit setting on mount
+  useEffect(() => {
+    if (user?.center_info?.id) {
+      apiService.getCenterById(user.center_info.id).then(centerData => {
+        setRateLimitEnabled(
+          typeof centerData.emergency_alert_rate_limit_enabled === 'boolean'
+            ? centerData.emergency_alert_rate_limit_enabled
+            : null
+        );
+      });
+    }
+  }, [user?.center_info?.id]);
+
+  const handleRateLimitToggle = async () => {
+    if (!user?.center_info?.id || rateLimitEnabled === null) return;
+    setRateLimitSaving(true);
+    try {
+      await apiService.setCenterRateLimit(user.center_info.id, !rateLimitEnabled);
+      setRateLimitEnabled(!rateLimitEnabled);
+    } catch (err) {
+      console.error('Toggle error:', err);
+    } finally {
+      setRateLimitSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight={400}>
@@ -516,27 +505,6 @@ const CenterDashboard: React.FC = () => {
                 <RefreshIcon />
               </IconButton>
             </Tooltip>
-            {/* Test button for debugging emergency alerts - HIDDEN */}
-            {/* <Tooltip title="Test Emergency Alert Notification">
-              <IconButton 
-                onClick={() => {
-                  console.log('Testing emergency alert notification...');
-                  const socket = socketService.getSocket();
-                  if (socket) {
-                    socket.emit('test_emergency_alert', {
-                      id: 'test-alert-' + Date.now(),
-                      center_id: user?.center_info?.id,
-                      alert_type: 'test',
-                      severity: 'high',
-                      timestamp: new Date().toISOString()
-                    });
-                  }
-                }}
-                sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-              >
-                <EmergencyIcon />
-              </IconButton>
-            </Tooltip> */}
           </Box>
         </Box>
         
@@ -1338,6 +1306,17 @@ const CenterDashboard: React.FC = () => {
           </Grid>
         )}
       </Grid>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={!!rateLimitEnabled}
+            onChange={handleRateLimitToggle}
+            // disabled={rateLimitSaving}
+          />
+        }
+        label="Enable Emergency Alert Rate Limiting"
+        sx={{ mt: 3 }}
+      />
     </Box>
   );
 };

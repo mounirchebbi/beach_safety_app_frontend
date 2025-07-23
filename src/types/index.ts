@@ -62,6 +62,7 @@ export interface Center {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  emergency_alert_rate_limit_enabled?: boolean; // <-- Add this line
 }
 
 export interface OperatingHours {
