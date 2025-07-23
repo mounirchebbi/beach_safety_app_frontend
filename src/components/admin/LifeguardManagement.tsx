@@ -39,6 +39,8 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  RestoreFromTrash as RestoreIcon,
+  DeleteForever as HardDeleteIcon,
   Visibility as ViewIcon,
   Schedule as ScheduleIcon,
   Person as PersonIcon,
@@ -86,6 +88,8 @@ const LifeguardManagement: React.FC = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   
   // Selected lifeguard
@@ -209,6 +213,18 @@ const LifeguardManagement: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
+  // Open restore dialog
+  const handleRestore = (lifeguard: LifeguardWithUser) => {
+    setSelectedLifeguard(lifeguard);
+    setRestoreDialogOpen(true);
+  };
+
+  // Open hard delete dialog
+  const handleHardDelete = (lifeguard: LifeguardWithUser) => {
+    setSelectedLifeguard(lifeguard);
+    setHardDeleteDialogOpen(true);
+  };
+
   // Create lifeguard
   const handleCreateSubmit = async () => {
     try {
@@ -249,8 +265,36 @@ const LifeguardManagement: React.FC = () => {
       if (!selectedLifeguard) return;
 
       await apiService.deleteLifeguard(selectedLifeguard.id);
-      setSuccess('Lifeguard deleted successfully');
+      setSuccess('Lifeguard deactivated successfully');
       setDeleteDialogOpen(false);
+      loadLifeguards();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to deactivate lifeguard');
+    }
+  };
+
+  // Restore lifeguard
+  const handleRestoreSubmit = async () => {
+    try {
+      if (!selectedLifeguard) return;
+
+      await apiService.restoreLifeguard(selectedLifeguard.id);
+      setSuccess('Lifeguard restored successfully');
+      setRestoreDialogOpen(false);
+      loadLifeguards();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to restore lifeguard');
+    }
+  };
+
+  // Hard delete lifeguard
+  const handleHardDeleteSubmit = async () => {
+    try {
+      if (!selectedLifeguard) return;
+
+      await apiService.hardDeleteLifeguard(selectedLifeguard.id);
+      setSuccess('Lifeguard permanently deleted');
+      setHardDeleteDialogOpen(false);
       loadLifeguards();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete lifeguard');
@@ -417,15 +461,38 @@ const LifeguardManagement: React.FC = () => {
                               <EditIcon />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDelete(lifeguard)}
-                              color="error"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
+                          {lifeguard.is_active ? (
+                            <Tooltip title="Deactivate">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDelete(lifeguard)}
+                                color="warning"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <>
+                              <Tooltip title="Restore">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleRestore(lifeguard)}
+                                  color="success"
+                                >
+                                  <RestoreIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Permanently Delete">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleHardDelete(lifeguard)}
+                                  color="error"
+                                >
+                                  <HardDeleteIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -775,20 +842,60 @@ const LifeguardManagement: React.FC = () => {
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Delete Lifeguard</DialogTitle>
+          <DialogTitle>Deactivate Lifeguard</DialogTitle>
           <DialogContent>
             <Typography>
-              Are you sure you want to delete{' '}
+              Are you sure you want to deactivate{' '}
               <strong>
                 {selectedLifeguard?.first_name} {selectedLifeguard?.last_name}
               </strong>
-              ? This action cannot be undone.
+              ? This action can be undone by restoring the lifeguard.
             </Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleDeleteSubmit} color="error" variant="contained">
-              Delete
+            <Button onClick={handleDeleteSubmit} color="warning" variant="contained">
+              Deactivate
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Restore Confirmation Dialog */}
+        <Dialog open={restoreDialogOpen} onClose={() => setRestoreDialogOpen(false)}>
+          <DialogTitle>Restore Lifeguard</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to restore{' '}
+              <strong>
+                {selectedLifeguard?.first_name} {selectedLifeguard?.last_name}
+              </strong>
+              ? This will reactivate their account.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRestoreDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRestoreSubmit} color="success" variant="contained">
+              Restore
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Hard Delete Confirmation Dialog */}
+        <Dialog open={hardDeleteDialogOpen} onClose={() => setHardDeleteDialogOpen(false)}>
+          <DialogTitle>Permanently Delete Lifeguard</DialogTitle>
+          <DialogContent>
+            <Typography color="error">
+              WARNING: This action cannot be undone. Are you sure you want to permanently delete{' '}
+              <strong>
+                {selectedLifeguard?.first_name} {selectedLifeguard?.last_name}
+              </strong>
+              ?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setHardDeleteDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleHardDeleteSubmit} color="error" variant="contained">
+              Permanently Delete
             </Button>
           </DialogActions>
         </Dialog>

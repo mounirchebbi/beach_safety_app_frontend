@@ -133,6 +133,14 @@ class ApiService {
     await this.api.delete(`/api/v1/centers/${id}`);
   }
 
+  async restoreCenter(id: string): Promise<void> {
+    await this.api.post(`/api/v1/centers/${id}/restore`);
+  }
+
+  async hardDeleteCenter(id: string): Promise<void> {
+    await this.api.delete(`/api/v1/centers/${id}/hard`);
+  }
+
   async getCenterLifeguards(centerId: string): Promise<any[]> {
     const response: AxiosResponse<PaginatedResponse<any>> = await this.api.get(`/api/v1/centers/${centerId}/lifeguards`);
     return response.data.data;
@@ -204,6 +212,14 @@ class ApiService {
 
   async deleteLifeguard(id: string): Promise<void> {
     await this.api.delete(`/api/v1/lifeguards/${id}`);
+  }
+
+  async restoreLifeguard(id: string): Promise<void> {
+    await this.api.post(`/api/v1/lifeguards/${id}/restore`);
+  }
+
+  async hardDeleteLifeguard(id: string): Promise<void> {
+    await this.api.delete(`/api/v1/lifeguards/${id}/hard`);
   }
 
   async getLifeguardShifts(lifeguardId: string): Promise<Shift[]> {
@@ -732,12 +748,6 @@ class ApiService {
     search?: string;
   }): Promise<{
     data: any[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
   }> {
     const params = new URLSearchParams();
     params.append('page', page.toString());
@@ -750,12 +760,6 @@ class ApiService {
     const response: AxiosResponse<{
       success: boolean;
       data: any[];
-      pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
     }> = await this.api.get(`/api/v1/auth/users?${params}`);
     
     return response.data;
@@ -794,6 +798,14 @@ class ApiService {
 
   async deleteUser(id: string): Promise<void> {
     await this.api.delete(`/api/v1/auth/users/${id}`);
+  }
+
+  async restoreUser(id: string): Promise<void> {
+    await this.api.post(`/api/v1/auth/users/${id}/restore`);
+  }
+
+  async hardDeleteUser(id: string): Promise<void> {
+    await this.api.delete(`/api/v1/auth/users/${id}/hard`);
   }
 
   async resetUserPassword(id: string, newPassword: string): Promise<void> {

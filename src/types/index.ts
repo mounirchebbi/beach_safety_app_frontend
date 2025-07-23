@@ -26,6 +26,8 @@ export interface User {
   phone?: string;
   center_id?: string;
   created_at: string;
+  updated_at?: string;
+  deleted_at?: string;
   is_active: boolean;
   lifeguard_info?: LifeguardInfo;
   center_info?: CenterInfo;

@@ -4,8 +4,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Grid,
-  Button,
   Table,
   TableBody,
   TableCell,
@@ -13,6 +11,9 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Button,
+  Chip,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -22,357 +23,438 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
-  IconButton,
-  Tooltip,
   Alert,
-  CircularProgress,
-  Tabs,
-  Tab,
-  Pagination,
+  Snackbar,
+  Tooltip,
   Switch,
   FormControlLabel,
-  Divider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+  Grid,
+  Pagination,
+  CircularProgress,
+  InputAdornment
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
+  RestoreFromTrash as RestoreIcon,
+  DeleteForever as HardDeleteIcon,
+  Edit as EditIcon,
   Visibility as ViewIcon,
   Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
-  Person as PersonIcon,
-  Business as BusinessIcon,
-  Security as SecurityIcon,
-  MyLocation as MyLocationIcon
+  Search as SearchIcon,
+  Add as AddIcon,
+  LocationOn as LocationIcon,
+  Phone as PhoneIcon,
+  Email as EmailIcon
 } from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../../services/api';
-import { Center, User } from '../../types';
+import { apiService } from '../../services/api';
+import { Center } from '../../types';
 
-// Map components
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix for default markers in react-leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
-});
-
-// Custom marker icon
-const customIcon = new L.Icon({
-  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyQzIgMTcuNTIgNi40OCAyMiAxMiAyMkMxNy41MiAyMiAyMiAxNy41MiAyMiAxMkMyMiA2LjQ4IDE3LjUyIDIgMTIgMloiIGZpbGw9IiNFNjE5M0YiLz4KPHBhdGggZD0iTTEyIDEzQzEzLjY1NiA5IDEzLjY1NiA5IDEyIDlDMTMuNjU2IDkgMTMuNjU2IDkgMTIgMTNaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Map click handler component
-interface MapClickHandlerProps {
-  onLocationSelect: (lat: number, lng: number) => void;
-  selectedLocation: { lat: number; lng: number } | null;
-}
-
-const MapClickHandler: React.FC<MapClickHandlerProps> = ({ onLocationSelect, selectedLocation }) => {
-  useMapEvents({
-    click: (e) => {
-      const { lat, lng } = e.latlng;
-      onLocationSelect(lat, lng);
-    },
-  });
-
-  return selectedLocation ? (
-    <Marker 
-      position={[selectedLocation.lat, selectedLocation.lng]} 
-      icon={customIcon}
-    />
-  ) : null;
-};
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`center-management-tabpanel-${index}`}
-      aria-labelledby={`center-management-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
+interface CenterManagementState {
+  centers: Center[];
+  loading: boolean;
+  error: string | null;
+  success: string | null;
+  page: number;
+  limit: number;
+  total: number;
+  filters: {
+    search?: string;
+    showInactive?: boolean;
+  };
+  selectedCenter: Center | null;
+  dialogOpen: boolean;
+  dialogType: 'view' | 'edit' | 'delete' | 'restore' | 'hardDelete' | null;
+  editForm: Partial<Center>;
 }
 
 const SystemCenterManagement: React.FC = () => {
-  const [tabValue, setTabValue] = useState(0);
-  const [centerDialogOpen, setCenterDialogOpen] = useState(false);
-  const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
-  const [centerPage, setCenterPage] = useState(1);
-  const [centerFilters, setCenterFilters] = useState({
-    search: ''
+  const [state, setState] = useState<CenterManagementState>({
+    centers: [],
+    loading: false,
+    error: null,
+    success: null,
+    page: 1,
+    limit: 10,
+    total: 0,
+    filters: {
+      showInactive: false
+    },
+    selectedCenter: null,
+    dialogOpen: false,
+    dialogType: null,
+    editForm: {}
   });
 
-  const queryClient = useQueryClient();
-
-  // Center form state
-  const [centerForm, setCenterForm] = useState({
-    name: '',
-    description: '',
-    address: '',
-    phone: '',
-    email: '',
-    operating_hours: '',
-    location: { lat: 0, lng: 0 }
-  });
-
-  // Queries
-  const { data: centersData, isLoading: centersLoading, error: centersError } = useQuery({
-    queryKey: ['centers'],
-    queryFn: () => api.getCenters()
-  });
-
-  // Mutations
-  const createCenterMutation = useMutation({
-    mutationFn: (data: any) => api.createCenter(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['centers'] });
-      setCenterDialogOpen(false);
-      resetCenterForm();
-    }
-  });
-
-  const updateCenterMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.updateCenter(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['centers'] });
-      setCenterDialogOpen(false);
-      resetCenterForm();
-    }
-  });
-
-  const deleteCenterMutation = useMutation({
-    mutationFn: (id: string) => api.deleteCenter(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['centers'] });
-    }
-  });
-
-  const resetCenterForm = () => {
-    setCenterForm({
-      name: '',
-      description: '',
-      address: '',
-      phone: '',
-      email: '',
-      operating_hours: '',
-      location: { lat: 0, lng: 0 }
-    });
-    setSelectedCenter(null);
-  };
-
-  const handleCenterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedCenter) {
-      updateCenterMutation.mutate({ id: selectedCenter.id, data: centerForm });
-    } else {
-      createCenterMutation.mutate(centerForm);
+  const loadCenters = async () => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const response = await apiService.getCenters();
+      setState(prev => ({
+        ...prev,
+        centers: response,
+        total: response.length,
+        loading: false
+      }));
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        error: error.response?.data?.message || 'Failed to load centers',
+        loading: false
+      }));
     }
   };
 
-  const handleEditCenter = (center: Center) => {
-    setSelectedCenter(center);
-    const location = center.location.coordinates ? 
-      { lng: center.location.coordinates[0], lat: center.location.coordinates[1] } : 
-      { lat: 0, lng: 0 };
+  useEffect(() => {
+    loadCenters();
+  }, []);
+
+  const handleFilterChange = (key: string, value: any) => {
+    setState(prev => ({
+      ...prev,
+      filters: { ...prev.filters, [key]: value }
+    }));
+  };
+
+  const openDialog = (type: CenterManagementState['dialogType'], center?: Center) => {
+    setState(prev => ({
+      ...prev,
+      dialogOpen: true,
+      dialogType: type,
+      selectedCenter: center || null,
+      editForm: center ? { ...center } : {}
+    }));
+  };
+
+  const closeDialog = () => {
+    setState(prev => ({
+      ...prev,
+      dialogOpen: false,
+      dialogType: null,
+      selectedCenter: null,
+      editForm: {}
+    }));
+  };
+
+  const handleSoftDelete = async () => {
+    if (!state.selectedCenter) return;
     
-    setCenterForm({
-      name: center.name,
-      description: center.description || '',
-      address: center.address || '',
-      phone: center.phone || '',
-      email: center.email || '',
-      operating_hours: center.operating_hours ? JSON.stringify(center.operating_hours) : '',
-      location
-    });
+    try {
+      await apiService.deleteCenter(state.selectedCenter.id);
+      setState(prev => ({
+        ...prev,
+        success: 'Center deactivated successfully',
+        dialogOpen: false,
+        dialogType: null,
+        selectedCenter: null
+      }));
+      loadCenters();
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        error: error.response?.data?.message || 'Failed to deactivate center'
+      }));
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!state.selectedCenter) return;
     
-    // Update map center to the center's location
-    if (location.lat !== 0 && location.lng !== 0) {
-      setMapCenter([location.lat, location.lng]);
+    try {
+      await apiService.restoreCenter(state.selectedCenter.id);
+      setState(prev => ({
+        ...prev,
+        success: 'Center restored successfully',
+        dialogOpen: false,
+        dialogType: null,
+        selectedCenter: null
+      }));
+      loadCenters();
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        error: error.response?.data?.message || 'Failed to restore center'
+      }));
     }
+  };
+
+  const handleHardDelete = async () => {
+    if (!state.selectedCenter) return;
     
-    setCenterDialogOpen(true);
-  };
-
-  const getStatusColor = (isActive: boolean) => {
-    return isActive ? 'success' : 'error';
-  };
-
-  const [deleteCenterId, setDeleteCenterId] = useState<string | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([36.8065, 10.1815]); // Default to Tunisia
-
-  const handleLocationSelect = (lat: number, lng: number) => {
-    setCenterForm({
-      ...centerForm,
-      location: { lat, lng }
-    });
-  };
-
-  const handleUseCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setCenterForm({
-            ...centerForm,
-            location: { lat: latitude, lng: longitude }
-          });
-          setMapCenter([latitude, longitude]);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          alert('Unable to get current location. Please select manually on the map.');
-        }
-      );
-    } else {
-      alert('Geolocation is not supported by this browser.');
+    try {
+      await apiService.hardDeleteCenter(state.selectedCenter.id);
+      setState(prev => ({
+        ...prev,
+        success: 'Center permanently deleted',
+        dialogOpen: false,
+        dialogType: null,
+        selectedCenter: null
+      }));
+      loadCenters();
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        error: error.response?.data?.message || 'Failed to delete center'
+      }));
     }
   };
 
-  // 1. Add the Users tab to the Tabs component:
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userPage, setUserPage] = useState(1);
-  const [userFilters, setUserFilters] = useState({
-    search: '',
-    role: '',
-    center_id: ''
-  });
-
-  // User form state
-  const [userForm, setUserForm] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    role: 'lifeguard',
-    center_id: '',
-    password: '',
-    is_active: true
-  });
-
-  // Queries
-  const { data: usersData = { data: [], pagination: { page: 1, limit: 30, total: 0, pages: 1 } }, isLoading: usersLoading, error: usersError } = useQuery({
-    queryKey: ['users', userPage, userFilters],
-    queryFn: () => api.getAllUsers(userPage, 30, userFilters)
-  });
-
-  // Mutations
-  const createUserMutation = useMutation({
-    mutationFn: (data: any) => api.createUser(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setUserDialogOpen(false);
-      resetUserForm();
-    }
-  });
-
-  const updateUserMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.updateUser(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setUserDialogOpen(false);
-      resetUserForm();
-    }
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: (id: string) => api.deleteUser(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    }
-  });
-
-  const resetUserForm = () => {
-    setUserForm({
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      role: 'lifeguard',
-      center_id: '',
-      password: '',
-      is_active: true
-    });
-    setSelectedUser(null);
-  };
-
-  const handleUserSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedUser) {
-      updateUserMutation.mutate({ id: selectedUser.id, data: userForm });
-    } else {
-      createUserMutation.mutate(userForm);
+  const handleUpdateCenter = async () => {
+    if (!state.selectedCenter) return;
+    
+    try {
+      // Convert the editForm to match the expected CenterFormData type
+      const updateData = {
+        ...state.editForm,
+        location: state.editForm.location ? {
+          lat: state.editForm.location.coordinates?.[1] || 0,
+          lng: state.editForm.location.coordinates?.[0] || 0
+        } : undefined
+      };
+      
+      await apiService.updateCenter(state.selectedCenter.id, updateData);
+      setState(prev => ({
+        ...prev,
+        success: 'Center updated successfully',
+        dialogOpen: false,
+        dialogType: null,
+        selectedCenter: null
+      }));
+      loadCenters();
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        error: error.response?.data?.message || 'Failed to update center'
+      }));
     }
   };
 
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setUserForm({
-      first_name: user.first_name,
-      last_name: user.last_name,
-      email: user.email,
-      phone: user.phone || '',
-      role: user.role,
-      center_id: user.center_id || '',
-      password: '', // Password is not editable
-      is_active: user.is_active
-    });
-    setUserDialogOpen(true);
-  };
-
-  const handleResetPassword = (id: string) => {
-    const newPassword = window.prompt('Enter a new password for this user:');
-    if (!newPassword) return;
-    if (window.confirm('Are you sure you want to reset the password for this user?')) {
-      api.resetUserPassword(id, newPassword).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['users'] });
-        alert('Password reset successful!');
-      }).catch(err => {
-        alert(`Error resetting password: ${err.message}`);
-      });
+  const getStatusChip = (center: Center) => {
+    if (!center.is_active) {
+      return <Chip label="Inactive" color="error" size="small" />;
     }
+    return <Chip label="Active" color="success" size="small" />;
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'system_admin':
-        return 'primary';
-      case 'center_admin':
-        return 'info';
-      case 'lifeguard':
-        return 'success';
+  const renderDialog = () => {
+    if (!state.selectedCenter) return null;
+
+    switch (state.dialogType) {
+      case 'view':
+        return (
+          <Dialog open={state.dialogOpen} onClose={closeDialog} maxWidth="md" fullWidth>
+            <DialogTitle>Center Details</DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2">Name</Typography>
+                  <Typography variant="body1">{state.selectedCenter.name}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2">Status</Typography>
+                  {getStatusChip(state.selectedCenter)}
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2">Description</Typography>
+                  <Typography variant="body1">{state.selectedCenter.description || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2">Address</Typography>
+                  <Typography variant="body1">{state.selectedCenter.address || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2">Phone</Typography>
+                  <Typography variant="body1">{state.selectedCenter.phone || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2">Email</Typography>
+                  <Typography variant="body1">{state.selectedCenter.email || 'N/A'}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2">Location</Typography>
+                  <Typography variant="body1">
+                    {state.selectedCenter.location?.coordinates?.[1]?.toFixed(6)}, {state.selectedCenter.location?.coordinates?.[0]?.toFixed(6)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="subtitle2">Created</Typography>
+                  <Typography variant="body1">{new Date(state.selectedCenter.created_at).toLocaleDateString()}</Typography>
+                </Grid>
+                {state.selectedCenter.updated_at && (
+                  <Grid item xs={6}>
+                    <Typography variant="subtitle2">Last Updated</Typography>
+                    <Typography variant="body1">{new Date(state.selectedCenter.updated_at).toLocaleDateString()}</Typography>
+                  </Grid>
+                )}
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeDialog}>Close</Button>
+            </DialogActions>
+          </Dialog>
+        );
+
+      case 'edit':
+        return (
+          <Dialog open={state.dialogOpen} onClose={closeDialog} maxWidth="md" fullWidth>
+            <DialogTitle>Edit Center</DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Name"
+                    value={state.editForm.name || ''}
+                    onChange={(e) => setState(prev => ({
+                      ...prev,
+                      editForm: { ...prev.editForm, name: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    multiline
+                    rows={3}
+                    value={state.editForm.description || ''}
+                    onChange={(e) => setState(prev => ({
+                      ...prev,
+                      editForm: { ...prev.editForm, description: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Address"
+                    value={state.editForm.address || ''}
+                    onChange={(e) => setState(prev => ({
+                      ...prev,
+                      editForm: { ...prev.editForm, address: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Phone"
+                    value={state.editForm.phone || ''}
+                    onChange={(e) => setState(prev => ({
+                      ...prev,
+                      editForm: { ...prev.editForm, phone: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    type="email"
+                    value={state.editForm.email || ''}
+                    onChange={(e) => setState(prev => ({
+                      ...prev,
+                      editForm: { ...prev.editForm, email: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={state.editForm.is_active || false}
+                        onChange={(e) => setState(prev => ({
+                          ...prev,
+                          editForm: { ...prev.editForm, is_active: e.target.checked }
+                        }))}
+                      />
+                    }
+                    label="Active"
+                  />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeDialog}>Cancel</Button>
+              <Button onClick={handleUpdateCenter} variant="contained">Update</Button>
+            </DialogActions>
+          </Dialog>
+        );
+
+      case 'delete':
+        return (
+          <Dialog open={state.dialogOpen} onClose={closeDialog}>
+            <DialogTitle>Deactivate Center</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Are you sure you want to deactivate {state.selectedCenter.name}?
+                This action can be undone by restoring the center.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeDialog}>Cancel</Button>
+              <Button onClick={handleSoftDelete} color="warning" variant="contained">
+                Deactivate
+              </Button>
+            </DialogActions>
+          </Dialog>
+        );
+
+      case 'restore':
+        return (
+          <Dialog open={state.dialogOpen} onClose={closeDialog}>
+            <DialogTitle>Restore Center</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Are you sure you want to restore {state.selectedCenter.name}?
+                This will reactivate the center.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeDialog}>Cancel</Button>
+              <Button onClick={handleRestore} color="success" variant="contained">
+                Restore
+              </Button>
+            </DialogActions>
+          </Dialog>
+        );
+
+      case 'hardDelete':
+        return (
+          <Dialog open={state.dialogOpen} onClose={closeDialog}>
+            <DialogTitle>Permanently Delete Center</DialogTitle>
+            <DialogContent>
+              <Typography color="error">
+                WARNING: This action cannot be undone. Are you sure you want to permanently delete {state.selectedCenter.name}?
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeDialog}>Cancel</Button>
+              <Button onClick={handleHardDelete} color="error" variant="contained">
+                Permanently Delete
+              </Button>
+            </DialogActions>
+          </Dialog>
+        );
+
       default:
-        return 'default';
+        return null;
     }
   };
 
-  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const filteredCenters = state.centers.filter(center => {
+    if (state.filters.search) {
+      const searchTerm = state.filters.search.toLowerCase();
+      if (!center.name.toLowerCase().includes(searchTerm) && 
+          !(center.description?.toLowerCase().includes(searchTerm)) &&
+          !(center.address?.toLowerCase().includes(searchTerm))) {
+        return false;
+      }
+    }
+    if (!state.filters.showInactive && !center.is_active) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <Box>
@@ -380,542 +462,171 @@ const SystemCenterManagement: React.FC = () => {
         System Center Management
       </Typography>
 
+      {/* Filters */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                placeholder="Search centers..."
+                value={state.filters.search || ''}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={state.filters.showInactive || false}
+                    onChange={(e) => handleFilterChange('showInactive', e.target.checked)}
+                  />
+                }
+                label="Show Inactive Centers"
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={loadCenters}
+              >
+                Refresh
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Centers Table */}
       <Card>
         <CardContent>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
-              <Tab 
-                icon={<BusinessIcon />} 
-                label="Centers" 
-                iconPosition="start"
-              />
-              <Tab icon={<PersonIcon />} label="Users" iconPosition="start" />
-            </Tabs>
-          </Box>
-
-          {/* Centers Tab */}
-          <TabPanel value={tabValue} index={0}>
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6">Manage Centers</Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  resetCenterForm();
-                  setCenterDialogOpen(true);
-                }}
-              >
-                Add Center
-              </Button>
+          {state.loading ? (
+            <Box display="flex" justifyContent="center" p={3}>
+              <CircularProgress />
             </Box>
-
-            {centersError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                Error loading centers: {centersError.message}
-              </Alert>
-            )}
-
-            {centersLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-              </Box>
-            ) : (
+          ) : (
+            <>
               <TableContainer component={Paper}>
                 <Table>
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
-                      <TableCell>Address</TableCell>
-                      <TableCell>Phone</TableCell>
-                      <TableCell>Email</TableCell>
+                      <TableCell>Description</TableCell>
+                      <TableCell>Contact</TableCell>
                       <TableCell>Status</TableCell>
-                      <TableCell>Actions</TableCell>
+                      <TableCell>Created</TableCell>
+                      <TableCell align="center">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {centersData?.map((center) => (
+                    {filteredCenters.map((center) => (
                       <TableRow key={center.id}>
-                        <TableCell>{center.name}</TableCell>
-                        <TableCell>{center.address || 'N/A'}</TableCell>
-                        <TableCell>{center.phone || 'N/A'}</TableCell>
-                        <TableCell>{center.email || 'N/A'}</TableCell>
                         <TableCell>
-                          <Chip
-                            label={center.is_active ? 'Active' : 'Inactive'}
-                            color={getStatusColor(center.is_active)}
-                            size="small"
-                          />
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {center.name}
+                          </Typography>
                         </TableCell>
                         <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {center.description || 'No description'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            {center.phone && (
+                              <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                <PhoneIcon fontSize="small" color="action" />
+                                <Typography variant="body2">{center.phone}</Typography>
+                              </Box>
+                            )}
+                            {center.email && (
+                              <Box display="flex" alignItems="center" gap={1}>
+                                <EmailIcon fontSize="small" color="action" />
+                                <Typography variant="body2">{center.email}</Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusChip(center)}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(center.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="View Details">
+                            <IconButton onClick={() => openDialog('view', center)} size="small">
+                              <ViewIcon />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Edit Center">
-                            <IconButton onClick={() => handleEditCenter(center)}>
+                            <IconButton onClick={() => openDialog('edit', center)} size="small">
                               <EditIcon />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete Center">
-                            <IconButton 
-                              onClick={() => setDeleteCenterId(center.id)}
-                              color="error"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
+                          {center.is_active ? (
+                            <Tooltip title="Deactivate Center">
+                              <IconButton onClick={() => openDialog('delete', center)} size="small" color="warning">
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <>
+                              <Tooltip title="Restore Center">
+                                <IconButton onClick={() => openDialog('restore', center)} size="small" color="success">
+                                  <RestoreIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Permanently Delete">
+                                <IconButton onClick={() => openDialog('hardDelete', center)} size="small" color="error">
+                                  <HardDeleteIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </TableContainer>
-            )}
-            {/* Center Delete Confirmation Dialog */}
-            <Dialog open={!!deleteCenterId} onClose={() => setDeleteCenterId(null)}>
-              <DialogTitle>Confirm Delete</DialogTitle>
-              <DialogContent>
-                <Typography>Are you sure you want to delete this center?</Typography>
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={() => setDeleteCenterId(null)}>Cancel</Button>
-                <Button 
-                  onClick={() => {
-                    if (deleteCenterId) deleteCenterMutation.mutate(deleteCenterId);
-                    setDeleteCenterId(null);
-                  }}
-                  color="error"
-                  variant="contained"
-                >
-                  Delete
-                </Button>
-              </DialogActions>
-            </Dialog>
-          </TabPanel>
-
-          {/* Users Tab */}
-          <TabPanel value={tabValue} index={1}>
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6">Manage Users</Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  resetUserForm();
-                  setUserDialogOpen(true);
-                }}
-              >
-                Add User
-              </Button>
-            </Box>
-            {/* Filters */}
-            <Accordion sx={{ mb: 2 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Filters</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Role</InputLabel>
-                      <Select
-                        value={userFilters.role}
-                        onChange={(e) => setUserFilters({ ...userFilters, role: e.target.value })}
-                        label="Role"
-                      >
-                        <MenuItem value="">All Roles</MenuItem>
-                        <MenuItem value="system_admin">System Admin</MenuItem>
-                        <MenuItem value="center_admin">Center Admin</MenuItem>
-                        <MenuItem value="lifeguard">Lifeguard</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Center</InputLabel>
-                      <Select
-                        value={userFilters.center_id}
-                        onChange={(e) => setUserFilters({ ...userFilters, center_id: e.target.value })}
-                        label="Center"
-                      >
-                        <MenuItem value="">All Centers</MenuItem>
-                        {centersData?.map((center) => (
-                          <MenuItem key={center.id} value={center.id}>
-                            {center.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="Search"
-                      value={userFilters.search}
-                      onChange={(e) => setUserFilters({ ...userFilters, search: e.target.value })}
-                      placeholder="Search by name or email"
-                    />
-                  </Grid>
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
-            {usersError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                Error loading users: {usersError.message}
-              </Alert>
-            )}
-            {usersLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-              </Box>
-            ) : (
-              <>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Email</TableCell>
-                        <TableCell>Role</TableCell>
-                        <TableCell>Center</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {usersData.data?.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>{`${user.first_name} ${user.last_name}`}</TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={user.role.replace('_', ' ')}
-                              color={getRoleColor(user.role)}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>{user.center_name || 'N/A'}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={user.is_active ? 'Active' : 'Inactive'}
-                              color={getStatusColor(user.is_active)}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Tooltip title="Edit User">
-                              <IconButton onClick={() => handleEditUser(user)}>
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Reset Password">
-                              <IconButton onClick={() => handleResetPassword(user.id)}>
-                                <SecurityIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete User">
-                              <IconButton onClick={() => setDeleteUserId(user.id)} color="error">
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                {/* User Delete Confirmation Dialog */}
-                <Dialog open={!!deleteUserId} onClose={() => setDeleteUserId(null)}>
-                  <DialogTitle>Confirm Delete</DialogTitle>
-                  <DialogContent>
-                    <Typography>Are you sure you want to delete this user?</Typography>
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={() => setDeleteUserId(null)}>Cancel</Button>
-                    <Button
-                      onClick={() => {
-                        if (deleteUserId) deleteUserMutation.mutate(deleteUserId);
-                        setDeleteUserId(null);
-                      }}
-                      color="error"
-                      variant="contained"
-                    >
-                      Delete
-                    </Button>
-                  </DialogActions>
-                </Dialog>
-                {/* User Dialog */}
-                <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="md" fullWidth>
-                  <DialogTitle>{selectedUser ? 'Edit User' : 'Add New User'}</DialogTitle>
-                  <form onSubmit={handleUserSubmit}>
-                    <DialogContent>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="First Name"
-                            value={userForm.first_name}
-                            onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })}
-                            required
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Last Name"
-                            value={userForm.last_name}
-                            onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })}
-                            required
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Email"
-                            type="email"
-                            value={userForm.email}
-                            onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                            required
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Phone"
-                            value={userForm.phone}
-                            onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <FormControl fullWidth required>
-                            <InputLabel>Role</InputLabel>
-                            <Select
-                              value={userForm.role}
-                              onChange={(e) => setUserForm({ ...userForm, role: e.target.value as any })}
-                              label="Role"
-                            >
-                              <MenuItem value="system_admin">System Admin</MenuItem>
-                              <MenuItem value="center_admin">Center Admin</MenuItem>
-                              <MenuItem value="lifeguard">Lifeguard</MenuItem>
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <FormControl fullWidth>
-                            <InputLabel>Center</InputLabel>
-                            <Select
-                              value={userForm.center_id}
-                              onChange={(e) => setUserForm({ ...userForm, center_id: e.target.value })}
-                              label="Center"
-                            >
-                              <MenuItem value="">No Center</MenuItem>
-                              {centersData?.map((center) => (
-                                <MenuItem key={center.id} value={center.id}>
-                                  {center.name}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        {!selectedUser && (
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              fullWidth
-                              label="Password"
-                              type="password"
-                              value={userForm.password}
-                              onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                              required
-                            />
-                          </Grid>
-                        )}
-                        <Grid item xs={12} sm={6}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={userForm.is_active}
-                                onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })}
-                              />
-                            }
-                            label="Active"
-                          />
-                        </Grid>
-                      </Grid>
-                    </DialogContent>
-                    <DialogActions>
-                      <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={createUserMutation.isPending || updateUserMutation.isPending}
-                      >
-                        {createUserMutation.isPending || updateUserMutation.isPending ? (
-                          <CircularProgress size={20} />
-                        ) : (
-                          selectedUser ? 'Update' : 'Create'
-                        )}
-                      </Button>
-                    </DialogActions>
-                  </form>
-                </Dialog>
-              </>
-            )}
-          </TabPanel>
+            </>
+          )}
         </CardContent>
       </Card>
 
-      {/* Center Dialog */}
-      <Dialog open={centerDialogOpen} onClose={() => setCenterDialogOpen(false)} maxWidth="lg" fullWidth>
-        <DialogTitle>{selectedCenter ? 'Edit Center' : 'Add New Center'}</DialogTitle>
-        <form onSubmit={handleCenterSubmit}>
-          <DialogContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Center Name"
-                  value={centerForm.name}
-                  onChange={(e) => setCenterForm({ ...centerForm, name: e.target.value })}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Phone"
-                  value={centerForm.phone}
-                  onChange={(e) => setCenterForm({ ...centerForm, phone: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  value={centerForm.description}
-                  onChange={(e) => setCenterForm({ ...centerForm, description: e.target.value })}
-                  multiline
-                  rows={3}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Address"
-                  value={centerForm.address}
-                  onChange={(e) => setCenterForm({ ...centerForm, address: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  value={centerForm.email}
-                  onChange={(e) => setCenterForm({ ...centerForm, email: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Operating Hours"
-                  value={centerForm.operating_hours}
-                  onChange={(e) => setCenterForm({ ...centerForm, operating_hours: e.target.value })}
-                  placeholder="e.g., Mon-Fri: 8AM-6PM, Sat-Sun: 9AM-5PM"
-                />
-              </Grid>
-              
-              {/* Map Section */}
-              <Grid item xs={12}>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                  Location
-                </Typography>
-                <Box sx={{ mb: 2 }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<MyLocationIcon />}
-                    onClick={handleUseCurrentLocation}
-                    sx={{ mr: 2 }}
-                  >
-                    Use Current Location
-                  </Button>
-                  <Typography variant="body2" color="text.secondary">
-                    Click on the map to set the center location, or use your current location
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ height: 400, width: '100%', mb: 2 }}>
-                  <MapContainer
-                    center={mapCenter}
-                    zoom={13}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <MapClickHandler
-                      onLocationSelect={handleLocationSelect}
-                      selectedLocation={centerForm.location.lat !== 0 ? centerForm.location : null}
-                    />
-                  </MapContainer>
-                </Box>
-              </Grid>
+      {/* Dialogs */}
+      {renderDialog()}
 
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Latitude"
-                  type="number"
-                  value={centerForm.location.lat}
-                  onChange={(e) => {
-                    const lat = parseFloat(e.target.value) || 0;
-                    setCenterForm({ 
-                      ...centerForm, 
-                      location: { ...centerForm.location, lat }
-                    });
-                    if (lat !== 0) {
-                      setMapCenter([lat, centerForm.location.lng]);
-                    }
-                  }}
-                  required
-                  inputProps={{ step: "any" }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Longitude"
-                  type="number"
-                  value={centerForm.location.lng}
-                  onChange={(e) => {
-                    const lng = parseFloat(e.target.value) || 0;
-                    setCenterForm({ 
-                      ...centerForm, 
-                      location: { ...centerForm.location, lng }
-                    });
-                    if (lng !== 0) {
-                      setMapCenter([centerForm.location.lat, lng]);
-                    }
-                  }}
-                  required
-                  inputProps={{ step: "any" }}
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setCenterDialogOpen(false)}>Cancel</Button>
-            <Button 
-              type="submit" 
-              variant="contained"
-              disabled={createCenterMutation.isPending || updateCenterMutation.isPending}
-            >
-              {createCenterMutation.isPending || updateCenterMutation.isPending ? (
-                <CircularProgress size={20} />
-              ) : (
-                selectedCenter ? 'Update' : 'Create'
-              )}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
+      {/* Notifications */}
+      <Snackbar
+        open={!!state.error}
+        autoHideDuration={6000}
+        onClose={() => setState(prev => ({ ...prev, error: null }))}
+      >
+        <Alert severity="error" onClose={() => setState(prev => ({ ...prev, error: null }))}>
+          {state.error}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!state.success}
+        autoHideDuration={6000}
+        onClose={() => setState(prev => ({ ...prev, success: null }))}
+      >
+        <Alert severity="success" onClose={() => setState(prev => ({ ...prev, success: null }))}>
+          {state.success}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
