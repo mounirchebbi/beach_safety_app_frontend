@@ -6,13 +6,7 @@ import {
   CardContent,
   Button,
   Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
+  Grid,
   Alert,
   CircularProgress,
   IconButton,
@@ -21,21 +15,35 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Paper,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction,
+  Avatar,
+  Badge,
+  Fade,
+  Slide,
+  Stack,
+  LinearProgress,
+  Fab,
+  Divider,
+  CardActionArea,
+  CardActions,
+  CardMedia,
+  ListItemButton,
+  ListItemAvatar,
+  Collapse,
+  Zoom,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  TextField,
-  Grid,
-  Stack,
-  Divider,
-  Avatar,
-  Badge,
-  LinearProgress,
-  Fade,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+  TextField
 } from '@mui/material';
 import {
   Warning as EmergencyIcon,
@@ -45,35 +53,259 @@ import {
   Info as InfoIcon,
   Refresh as RefreshIcon,
   Visibility as ViewIcon,
+  Assignment as AssignIcon,
   Close as CloseIcon,
-  FilterList as FilterIcon,
-  TrendingUp as TrendingIcon,
-  People as PeopleIcon,
-  Schedule as ScheduleIcon,
   LocationOn as LocationIcon,
-  ExpandMore as ExpandMoreIcon,
+  AccessTime as TimeIcon,
+  Person as PersonIcon,
+  Description as DescriptionIcon,
+  Map as MapIcon,
+  PriorityHigh as PriorityIcon,
+  Notifications as NotificationIcon,
+  Warning as CriticalIcon,
   LocalHospital as MedicalIcon,
-  Security as SecurityIcon,
-  BeachAccess as BeachIcon,
-  Notifications as NotificationsIcon,
-  Wifi as WifiIcon,
-  WifiOff as WifiOffIcon
+  Pool as DrowningIcon,
+  WbSunny as WeatherIcon,
+  ExpandMore as ExpandMoreIcon,
+  PlayArrow as RespondIcon,
+  TrendingUp as EscalateIcon,
+  Fullscreen as FullscreenIcon,
+  Speed as SpeedIcon,
+  FlashOn as FlashIcon,
+  RadioButtonChecked as ActiveIcon,
+  RadioButtonUnchecked as InactiveIcon,
+  CheckCircleOutline as ResolvedIcon,
+  Cancel as ClosedIcon,
+  Add as AddIcon,
+  Report as ReportIcon,
+  CheckCircle as ResolveIcon,
+  Block as CloseActionIcon,
+  CallMerge as EscalationIcon,
+  Support as SupportIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../hooks/useSocket';
 import { apiService } from '../../services/api';
-import { EmergencyAlert, Lifeguard } from '../../types';
+import { EmergencyAlert, Lifeguard, EmergencyEscalation, Center } from '../../types';
+import BeachMap from '../map/BeachMap';
+import { socketService } from '../../services/socket';
 
-interface AlertStats {
-  total: number;
-  active: number;
-  responding: number;
-  resolved: number;
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-}
+// Enhanced severity colors with professional aesthetic
+const getSeverityConfig = (severity: string) => {
+  switch (severity.toLowerCase()) {
+    case 'critical':
+      return {
+        color: '#d32f2f',
+        bgColor: '#ffebee',
+        borderColor: '#f44336',
+        gradientColor: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)',
+        icon: <CriticalIcon />,
+        label: 'CRITICAL',
+        priority: 4,
+        animation: {
+          animation: 'criticalPulse 2s infinite',
+          '@keyframes criticalPulse': {
+            '0%': { opacity: 1, transform: 'scale(1)' },
+            '50%': { opacity: 0.7, transform: 'scale(1.05)' },
+            '100%': { opacity: 1, transform: 'scale(1)' }
+          }
+        }
+      };
+    case 'high':
+      return {
+        color: '#f57c00',
+        bgColor: '#fff3e0',
+        borderColor: '#ff9800',
+        gradientColor: 'linear-gradient(135deg, #f57c00 0%, #e65100 100%)',
+        icon: <WarningIcon />,
+        label: 'HIGH',
+        priority: 3,
+        animation: {}
+      };
+    case 'medium':
+      return {
+        color: '#1976d2',
+        bgColor: '#e3f2fd',
+        borderColor: '#2196f3',
+        gradientColor: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+        icon: <InfoIcon />,
+        label: 'MEDIUM',
+        priority: 2,
+        animation: {}
+      };
+    case 'low':
+      return {
+        color: '#388e3c',
+        bgColor: '#e8f5e8',
+        borderColor: '#4caf50',
+        gradientColor: 'linear-gradient(135deg, #388e3c 0%, #2e7d32 100%)',
+        icon: <CheckCircleIcon />,
+        label: 'LOW',
+        priority: 1,
+        animation: {}
+      };
+    default:
+      return {
+        color: '#757575',
+        bgColor: '#f5f5f5',
+        borderColor: '#9e9e9e',
+        gradientColor: 'linear-gradient(135deg, #757575 0%, #616161 100%)',
+        icon: <InfoIcon />,
+        label: 'UNKNOWN',
+        priority: 0,
+        animation: {}
+      };
+  }
+};
+
+const getStatusConfig = (status: string) => {
+  switch (status.toLowerCase()) {
+    case 'active':
+      return {
+        color: '#d32f2f',
+        bgColor: '#ffebee',
+        borderColor: '#f44336',
+        gradientColor: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)',
+        icon: <ActiveIcon />,
+        label: 'ACTIVE',
+        priority: 3
+      };
+    case 'responding':
+      return {
+        color: '#f57c00',
+        bgColor: '#fff3e0',
+        borderColor: '#ff9800',
+        gradientColor: 'linear-gradient(135deg, #f57c00 0%, #e65100 100%)',
+        icon: <RespondIcon />,
+        label: 'RESPONDING',
+        priority: 2
+      };
+    case 'resolved':
+      return {
+        color: '#388e3c',
+        bgColor: '#e8f5e8',
+        borderColor: '#4caf50',
+        gradientColor: 'linear-gradient(135deg, #388e3c 0%, #2e7d32 100%)',
+        icon: <ResolvedIcon />,
+        label: 'RESOLVED',
+        priority: 1
+      };
+    case 'closed':
+      return {
+        color: '#757575',
+        bgColor: '#f5f5f5',
+        borderColor: '#9e9e9e',
+        gradientColor: 'linear-gradient(135deg, #757575 0%, #616161 100%)',
+        icon: <ClosedIcon />,
+        label: 'CLOSED',
+        priority: 0
+      };
+    default:
+      return {
+        color: '#757575',
+        bgColor: '#f5f5f5',
+        borderColor: '#9e9e9e',
+        gradientColor: 'linear-gradient(135deg, #757575 0%, #616161 100%)',
+        icon: <InactiveIcon />,
+        label: 'UNKNOWN',
+        priority: 0
+      };
+  }
+};
+
+const getMaximumUrgencyLevel = (alert: EmergencyAlert) => {
+  const severityPriority = getSeverityConfig(alert.severity).priority;
+  const statusPriority = getStatusConfig(alert.status).priority;
+  
+  // Calculate urgency based on severity and status
+  if (alert.severity === 'critical' && alert.status === 'active') return 'maximum';
+  if (alert.severity === 'critical') return 'critical';
+  if (alert.severity === 'high' && alert.status === 'active') return 'high';
+  if (alert.severity === 'high') return 'medium';
+  if (alert.status === 'active') return 'medium';
+  return 'low';
+};
+
+const getMaximumUrgencyAnimation = (urgencyLevel: string) => {
+  switch (urgencyLevel) {
+    case 'maximum':
+      return {
+        animation: 'maximumUrgencyPulse 1s infinite',
+        '@keyframes maximumUrgencyPulse': {
+          '0%': { opacity: 1, transform: 'scale(1)' },
+          '50%': { opacity: 0.5, transform: 'scale(1.2)' },
+          '100%': { opacity: 1, transform: 'scale(1)' }
+        }
+      };
+    case 'critical':
+      return {
+        animation: 'criticalUrgencyPulse 1.5s infinite',
+        '@keyframes criticalUrgencyPulse': {
+          '0%': { opacity: 1, transform: 'scale(1)' },
+          '50%': { opacity: 0.7, transform: 'scale(1.1)' },
+          '100%': { opacity: 1, transform: 'scale(1)' }
+        }
+      };
+    case 'high':
+      return {
+        animation: 'highUrgencyPulse 2s infinite',
+        '@keyframes highUrgencyPulse': {
+          '0%': { opacity: 1, transform: 'scale(1)' },
+          '50%': { opacity: 0.8, transform: 'scale(1.05)' },
+          '100%': { opacity: 1, transform: 'scale(1)' }
+        }
+      };
+    default:
+      return {};
+  }
+};
+
+const getMaximumUrgencyColor = (urgencyLevel: string) => {
+  switch (urgencyLevel) {
+    case 'maximum':
+      return {
+        color: '#d32f2f',
+        bgColor: '#ffebee',
+        borderColor: '#f44336',
+        gradientColor: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)'
+      };
+    case 'critical':
+      return {
+        color: '#f57c00',
+        bgColor: '#fff3e0',
+        borderColor: '#ff9800',
+        gradientColor: 'linear-gradient(135deg, #f57c00 0%, #e65100 100%)'
+      };
+    case 'high':
+      return {
+        color: '#1976d2',
+        bgColor: '#e3f2fd',
+        borderColor: '#2196f3',
+        gradientColor: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)'
+      };
+    default:
+      return {
+        color: '#757575',
+        bgColor: '#f5f5f5',
+        borderColor: '#9e9e9e',
+        gradientColor: 'linear-gradient(135deg, #757575 0%, #616161 100%)'
+      };
+  }
+};
+
+const getMaximumUrgencyIcon = (urgencyLevel: string) => {
+  switch (urgencyLevel) {
+    case 'maximum':
+      return <FlashIcon sx={{ color: '#d32f2f' }} />;
+    case 'critical':
+      return <CriticalIcon sx={{ color: '#f57c00' }} />;
+    case 'high':
+      return <SpeedIcon sx={{ color: '#1976d2' }} />;
+    default:
+      return <InfoIcon sx={{ color: '#757575' }} />;
+  }
+};
 
 const AdminEmergencyAlerts: React.FC = () => {
   const { user } = useAuth();
@@ -84,34 +316,208 @@ const AdminEmergencyAlerts: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterSeverity, setFilterSeverity] = useState<string>('all');
-  const [filterType, setFilterType] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'date' | 'severity'>('date');
   const [socketConnected, setSocketConnected] = useState(false);
   const [showAlertNotification, setShowAlertNotification] = useState(false);
-  const [stats, setStats] = useState<AlertStats>({
-    total: 0,
-    active: 0,
-    responding: 0,
-    resolved: 0,
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0
+  const [newAlertsCount, setNewAlertsCount] = useState(0);
+  const [lastAlertCount, setLastAlertCount] = useState(0);
+  const [linkedEscalations, setLinkedEscalations] = useState<EmergencyEscalation[]>([]);
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [escalationStatusDialogOpen, setEscalationStatusDialogOpen] = useState(false);
+  const [selectedEscalation, setSelectedEscalation] = useState<EmergencyEscalation | null>(null);
+  const [newEscalationStatus, setNewEscalationStatus] = useState<string>('');
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [supportFormData, setSupportFormData] = useState({
+    target_center_id: '',
+    escalation_id: '',
+    request_type: 'personnel_support' as 'personnel_support' | 'equipment_support' | 'medical_support' | 'evacuation_support' | 'coordination_support',
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
+    title: '',
+    description: '',
+    requested_resources: {}
   });
 
+  const fetchAlerts = async () => {
+    try {
+      if (!refreshing) {
+        setLoading(true);
+      }
+      setRefreshing(true);
+      const alertsData = await apiService.getAlerts();
+      
+      // Check for new alerts
+      if (lastAlertCount > 0 && alertsData.length > lastAlertCount) {
+        const newCount = alertsData.length - lastAlertCount;
+        setNewAlertsCount(newCount);
+        // Clear the notification after 5 seconds
+        setTimeout(() => setNewAlertsCount(0), 5000);
+      }
+      
+      setAlerts(alertsData);
+      setLastAlertCount(alertsData.length);
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch alerts');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const loadLifeguards = async () => {
+    try {
+      const lifeguardsData = await apiService.getLifeguards();
+      setLifeguards(lifeguardsData);
+    } catch (err: any) {
+      console.error('Failed to load lifeguards:', err);
+    }
+  };
+
+  const loadCenters = async () => {
+    try {
+      const centersData = await apiService.getOtherCenters();
+      setCenters(centersData);
+    } catch (err: any) {
+      console.error('Failed to load centers:', err);
+    }
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!selectedAlert || !newStatus) return;
+    
+    try {
+      await apiService.updateAlertStatus(selectedAlert.id, newStatus);
+      setStatusDialogOpen(false);
+      setNewStatus('');
+      fetchAlerts();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update alert status');
+    }
+  };
+
+  const handleAlertClick = (alert: EmergencyAlert) => {
+    setSelectedAlert(alert);
+    setMapDialogOpen(true);
+    loadLinkedEscalations(alert.id);
+  };
+
+  const loadLinkedEscalations = async (alertId: string) => {
+    try {
+      console.log('Loading linked escalations for alert:', alertId);
+      const escalations = await apiService.getCenterEscalations(1, 100);
+      console.log('All escalations received:', escalations);
+      
+      const linked = escalations.data.filter((escalation: EmergencyEscalation) => {
+        console.log('Checking escalation:', escalation.id, 'alert_id:', escalation.alert_id, 'against:', alertId);
+        return escalation.alert_id === alertId;
+      });
+      
+      console.log('Linked escalations found:', linked);
+      setLinkedEscalations(linked);
+    } catch (err: any) {
+      console.error('Failed to load linked escalations:', err);
+    }
+  };
+
+  const handleRequestSupport = () => {
+    // Initialize form with alert info
+    setSupportFormData({
+      target_center_id: '',
+      escalation_id: linkedEscalations.length > 0 ? linkedEscalations[0].id : '',
+      request_type: 'personnel_support',
+      priority: 'medium',
+      title: `Support for Alert ${selectedAlert?.id}`,
+      description: '',
+      requested_resources: {}
+    });
+    setSupportDialogOpen(true);
+  };
+
+  const handleSupportRequest = async () => {
+    try {
+      if (!supportFormData.target_center_id || !supportFormData.title || !supportFormData.description) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      await apiService.createInterCenterSupportRequest({
+        target_center_id: supportFormData.target_center_id,
+        escalation_id: supportFormData.escalation_id || undefined,
+        request_type: supportFormData.request_type,
+        priority: supportFormData.priority,
+        title: supportFormData.title,
+        description: supportFormData.description,
+        requested_resources: supportFormData.requested_resources
+      });
+      
+      setSupportDialogOpen(false);
+      setSupportFormData({
+        target_center_id: '',
+        escalation_id: '',
+        request_type: 'personnel_support',
+        priority: 'medium',
+        title: '',
+        description: '',
+        requested_resources: {}
+      });
+      setError(null);
+      // Show success notification
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to request support');
+    }
+  };
+
+  const handleSupportFormChange = (field: string, value: any) => {
+    setSupportFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleEscalationStatusUpdate = async () => {
+    if (!selectedEscalation || !newEscalationStatus) return;
+    
+    try {
+      if (newEscalationStatus === 'acknowledged') {
+        await apiService.acknowledgeEscalation(selectedEscalation.id);
+      } else if (newEscalationStatus === 'resolved') {
+        await apiService.resolveEscalation(selectedEscalation.id);
+      }
+      
+      setEscalationStatusDialogOpen(false);
+      setNewEscalationStatus('');
+      setSelectedEscalation(null);
+      
+      // Reload linked escalations to show updated status
+      if (selectedAlert) {
+        loadLinkedEscalations(selectedAlert.id);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update escalation status');
+    }
+  };
+
+  const handleEscalationStatusClick = (escalation: EmergencyEscalation) => {
+    setSelectedEscalation(escalation);
+    setNewEscalationStatus('');
+    setEscalationStatusDialogOpen(true);
+  };
+
+  // Load data on component mount
   useEffect(() => {
-    loadData();
+    fetchAlerts();
+    loadLifeguards();
+    loadCenters();
   }, []);
 
   // WebSocket connection and real-time updates
   useEffect(() => {
     if (!socket || !user?.center_info?.id) return;
 
-    console.log('Setting up WebSocket connection for center admin:', user.center_info.id);
+    console.log('Setting up WebSocket connection for center admin alerts:', user.center_info.id);
     
     // Check socket connection status
     if (socket.connected) {
@@ -144,36 +550,30 @@ const AdminEmergencyAlerts: React.FC = () => {
     // Listen for emergency alerts
     socket.on('emergency_alert', (data) => {
       console.log('New emergency alert received:', data);
-      console.log('Current user center ID:', user?.center_info?.id);
-      console.log('Alert center ID:', data.center_id);
       if (data.center_id === user?.center_info?.id) {
         console.log('Alert belongs to this center, refreshing data...');
-        loadData(); // Refresh alerts
+        fetchAlerts();
         setShowAlertNotification(true);
         // Auto-hide notification after 5 seconds
         setTimeout(() => setShowAlertNotification(false), 5000);
-      } else {
-        console.log('Alert does not belong to this center, ignoring...');
       }
     });
 
     // Listen for alert status changes
     socket.on('alert_status_change', (data) => {
       console.log('Alert status change received:', data);
-      console.log('Refreshing data due to status change...');
-      loadData(); // Refresh alerts
+      fetchAlerts();
     });
 
     // Listen for alert acknowledgments
     socket.on('alert_acknowledged', (data) => {
       console.log('Alert acknowledged:', data);
-      console.log('Refreshing data due to acknowledgment...');
-      loadData(); // Refresh alerts
+      fetchAlerts();
     });
 
     // Cleanup function
     return () => {
-      console.log('Cleaning up WebSocket connection for center admin');
+      console.log('Cleaning up WebSocket connection for center admin alerts');
       socket.off('emergency_alert');
       socket.off('alert_status_change');
       socket.off('alert_acknowledged');
@@ -184,699 +584,866 @@ const AdminEmergencyAlerts: React.FC = () => {
     };
   }, [socket, user?.center_info?.id]);
 
-  const loadData = async () => {
-    try {
-      setRefreshing(true);
-      setError(null);
-
-      // Load alerts
-      const alertsData = await apiService.getAlerts();
-      const centerAlerts = alertsData.filter((alert: EmergencyAlert) => 
-        alert.center_id === user?.center_info?.id
-      );
-      setAlerts(centerAlerts);
-
-      // Load lifeguards for assignment
-      const lifeguardsData = await apiService.getLifeguards();
-      const centerLifeguards = lifeguardsData.filter((lg: any) => 
-        lg.center_id === user?.center_info?.id && lg.user?.is_active
-      );
-      setLifeguards(centerLifeguards);
-
-      // Calculate stats
-      calculateStats(centerAlerts);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const calculateStats = (alertsData: EmergencyAlert[]) => {
-    const stats: AlertStats = {
-      total: alertsData.length,
-      active: alertsData.filter(a => a.status === 'active').length,
-      responding: alertsData.filter(a => a.status === 'responding').length,
-      resolved: alertsData.filter(a => a.status === 'resolved' || a.status === 'closed').length,
-      critical: alertsData.filter(a => a.severity === 'critical').length,
-      high: alertsData.filter(a => a.severity === 'high').length,
-      medium: alertsData.filter(a => a.severity === 'medium').length,
-      low: alertsData.filter(a => a.severity === 'low').length
-    };
-    setStats(stats);
-  };
-
-  const handleStatusUpdate = async () => {
-    if (!selectedAlert || !newStatus) return;
-
-    try {
-      await apiService.updateAlertStatus(selectedAlert.id, newStatus);
-      await loadData(); // Refresh the data
-      setStatusDialogOpen(false);
-      setSelectedAlert(null);
-      setNewStatus('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update alert status');
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'error';
-      case 'high': return 'warning';
-      case 'medium': return 'info';
-      case 'low': return 'success';
-      default: return 'default';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'error';
-      case 'responding': return 'warning';
-      case 'resolved': return 'success';
-      case 'closed': return 'default';
-      default: return 'default';
-    }
-  };
-
   const getAlertTypeIcon = (type: string) => {
-    switch (type) {
-      case 'sos': return <EmergencyIcon />;
-      case 'medical': return <MedicalIcon />;
-      case 'drowning': return <WarningIcon />;
-      case 'weather': return <InfoIcon />;
-      default: return <EmergencyIcon />;
+    switch (type.toLowerCase()) {
+      case 'sos':
+        return <EmergencyIcon />;
+      case 'medical':
+        return <MedicalIcon />;
+      case 'drowning':
+        return <DrowningIcon />;
+      case 'weather':
+        return <WeatherIcon />;
+      default:
+        return <EmergencyIcon />;
     }
   };
 
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
       return date.toLocaleString();
     } catch (error) {
       return 'Invalid Date';
     }
   };
 
-  const getFilteredAlerts = () => {
-    return alerts.filter(alert => {
-      const statusMatch = filterStatus === 'all' || alert.status === filterStatus;
-      const severityMatch = filterSeverity === 'all' || alert.severity === filterSeverity;
-      const typeMatch = filterType === 'all' || alert.alert_type === filterType;
-      return statusMatch && severityMatch && typeMatch;
-    });
+  const formatTimeAgo = (dateString: string) => {
+    try {
+      const now = new Date();
+      const alertTime = new Date(dateString);
+      const timeDiff = now.getTime() - alertTime.getTime();
+      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+      
+      if (minutesAgo < 1) return 'Just now';
+      if (minutesAgo < 60) return `${minutesAgo}m ago`;
+      const hoursAgo = Math.floor(minutesAgo / 60);
+      if (hoursAgo < 24) return `${hoursAgo}h ago`;
+      const daysAgo = Math.floor(hoursAgo / 24);
+      return `${daysAgo}d ago`;
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
-  const getAssignedLifeguardName = (lifeguardId: string) => {
-    const lifeguard = lifeguards.find(lg => lg.id === lifeguardId);
-    return lifeguard ? `${lifeguard.user.first_name} ${lifeguard.user.last_name}` : 'Unassigned';
-  };
+  // Sort alerts by selected order (date or severity)
+  const sortedAndFilteredAlerts = alerts
+    .sort((a, b) => {
+      if (sortOrder === 'date') {
+        // Sort by date (most recent first) then by severity
+        const timeA = new Date(a.created_at).getTime();
+        const timeB = new Date(b.created_at).getTime();
+        if (timeA !== timeB) {
+          return timeB - timeA;
+        }
+        
+        // Second priority: severity (critical first)
+        const severityA = getSeverityConfig(a.severity).priority;
+        const severityB = getSeverityConfig(b.severity).priority;
+        if (severityA !== severityB) {
+          return severityB - severityA;
+        }
+        
+        // Third priority: status (active first)
+        if (a.status === 'active' && b.status !== 'active') return -1;
+        if (b.status === 'active' && a.status !== 'active') return 1;
+        
+        return 0;
+      } else {
+        // Sort by severity (critical first) then by date
+        const severityA = getSeverityConfig(a.severity).priority;
+        const severityB = getSeverityConfig(b.severity).priority;
+        if (severityA !== severityB) {
+          return severityB - severityA;
+        }
+        
+        // Second priority: status (active first)
+        if (a.status === 'active' && b.status !== 'active') return -1;
+        if (b.status === 'active' && a.status !== 'active') return 1;
+        
+        // Third priority: time (most recent first)
+        const timeA = new Date(a.created_at).getTime();
+        const timeB = new Date(b.created_at).getTime();
+        return timeB - timeA;
+      }
+    });
+
+  const activeAlerts = alerts.filter(alert => alert.status === 'active');
+  const criticalAlerts = alerts.filter(alert => alert.severity === 'critical');
 
   if (loading) {
     return (
-      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight={400}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, gap: 2 }}>
         <CircularProgress size={60} />
-        <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary' }}>
-          Loading emergency alerts...
+        <Typography variant="h6" color="text.secondary">
+          Loading Emergency Alerts...
         </Typography>
       </Box>
     );
   }
 
-  const filteredAlerts = getFilteredAlerts();
-
   return (
-    <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
-      {/* Header */}
-      <Paper elevation={0} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #d32f2f 0%, #f44336 100%)', color: 'white' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f8fafc' }}>
+      {/* Enhanced Header with Emergency Mode Indicators */}
+      <Paper elevation={0} sx={{ p: 3, mb: 3, bgcolor: '#fff', borderRadius: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-              <EmergencyIcon sx={{ fontSize: 28 }} />
+            <Avatar sx={{ 
+              bgcolor: activeAlerts.length > 0 ? '#b71c1c' : '#757575',
+              width: 64, 
+              height: 64,
+              border: activeAlerts.length > 0 ? '3px solid #ff1744' : 'none',
+              ...(activeAlerts.length > 0 && {
+                animation: 'maximumEmergencyPulse 1.5s infinite',
+                '@keyframes maximumEmergencyPulse': {
+                  '0%': { 
+                    boxShadow: '0 0 0 0 #b71c1c',
+                    transform: 'scale(1)',
+                    borderColor: '#ff1744'
+                  },
+                  '50%': { 
+                    boxShadow: '0 0 0 20px #b71c1c00',
+                    transform: 'scale(1.1)',
+                    borderColor: '#ff6b35'
+                  },
+                  '100%': { 
+                    boxShadow: '0 0 0 0 #b71c1c00',
+                    transform: 'scale(1)',
+                    borderColor: '#ff1744'
+                  }
+                }
+              })
+            }}>
+              <EmergencyIcon sx={{ 
+                fontSize: 36,
+                filter: activeAlerts.length > 0 ? 'drop-shadow(0 0 8px #ffffff)' : 'none'
+              }} />
             </Avatar>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 600 }}>
+              <Typography variant="h4" sx={{ 
+                fontWeight: 700, 
+                color: activeAlerts.length > 0 ? '#d32f2f' : '#1a1a1a',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
                 Emergency Alerts Management
+                {activeAlerts.length > 0 && (
+                  <Chip
+                    label={`${activeAlerts.length} ACTIVE`}
+                    size="small"
+                    sx={{
+                      bgcolor: '#d32f2f',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      animation: 'blink 1s infinite',
+                      '@keyframes blink': {
+                        '0%, 50%': { opacity: 1 },
+                        '51%, 100%': { opacity: 0.5 }
+                      }
+                    }}
+                  />
+                )}
+                {refreshing && (
+                  <Chip
+                    label="UPDATING"
+                    size="small"
+                    sx={{
+                      bgcolor: '#1976d2',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      animation: 'pulse 1s infinite',
+                      '@keyframes pulse': {
+                        '0%': { opacity: 1 },
+                        '50%': { opacity: 0.7 },
+                        '100%': { opacity: 1 }
+                      }
+                    }}
+                  />
+                )}
               </Typography>
-              <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                Monitor and manage emergency situations at {user?.center_info?.name}
+              <Typography variant="body2" color="text.secondary">
+                {activeAlerts.length > 0 
+                  ? `🚨 ${activeAlerts.length} active emergency${activeAlerts.length > 1 ? 's' : ''} requiring immediate attention`
+                  : 'Real-time emergency response management for center administrators'
+                }
               </Typography>
             </Box>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* Connection Status Indicator */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                bgcolor: socketConnected ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
-                animation: socketConnected ? 'pulse 2s infinite' : 'none',
-                '@keyframes pulse': {
-                  '0%': { opacity: 1 },
-                  '50%': { opacity: 0.5 },
-                  '100%': { opacity: 1 }
-                }
-              }} />
-              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem' }}>
-                {socketConnected ? 'Live' : 'Offline'}
-              </Typography>
-            </Box>
-            <Tooltip title="Refresh Alerts">
-              <IconButton 
-                onClick={loadData}
-                disabled={refreshing}
-                sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel id="sort-order-label">Sort By</InputLabel>
+              <Select
+                labelId="sort-order-label"
+                value={sortOrder}
+                label="Sort By"
+                onChange={(e) => setSortOrder(e.target.value as 'date' | 'severity')}
+                sx={{ 
+                  bgcolor: 'white',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: activeAlerts.length > 0 ? '#d32f2f' : '#1976d2'
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: activeAlerts.length > 0 ? '#b71c1c' : '#1565c0'
+                  }
+                }}
               >
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
+                <MenuItem value="date">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TimeIcon sx={{ fontSize: 16 }} />
+                    Date (Recent First)
+                  </Box>
+                </MenuItem>
+                <MenuItem value="severity">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PriorityIcon sx={{ fontSize: 16 }} />
+                    Severity (Critical First)
+                  </Box>
+                </MenuItem>
+              </Select>
+            </FormControl>
+            <Button
+              variant="contained"
+              startIcon={refreshing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+              onClick={fetchAlerts}
+              disabled={refreshing}
+              sx={{ 
+                borderRadius: 2, 
+                bgcolor: activeAlerts.length > 0 ? '#d32f2f' : '#1976d2',
+                '&:hover': { bgcolor: activeAlerts.length > 0 ? '#b71c1c' : '#1565c0' },
+                '&:disabled': { bgcolor: '#ccc' }
+              }}
+            >
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </Box>
         </Box>
-        
-        {refreshing && <LinearProgress sx={{ bgcolor: 'rgba(255,255,255,0.3)', '& .MuiLinearProgress-bar': { bgcolor: 'white' } }} />}
       </Paper>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
           {error}
         </Alert>
       )}
 
-      {/* New Alert Notification */}
-      {showAlertNotification && (
+      {/* New Alerts Notification */}
+      {newAlertsCount > 0 && (
         <Alert 
           severity="warning" 
-          sx={{ mb: 3 }}
+          sx={{ 
+            mb: 3, 
+            borderRadius: 2,
+            animation: 'slideIn 0.5s ease-out',
+            '@keyframes slideIn': {
+              '0%': { transform: 'translateY(-100%)', opacity: 0 },
+              '100%': { transform: 'translateY(0)', opacity: 1 }
+            }
+          }}
           action={
-            <Button color="inherit" size="small" onClick={() => setShowAlertNotification(false)}>
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={() => setNewAlertsCount(0)}
+            >
               Dismiss
             </Button>
           }
         >
-          <Typography variant="body1" sx={{ fontWeight: 600 }}>
-            New Emergency Alert Received!
-          </Typography>
-          <Typography variant="body2">
-            A new emergency alert has been created. Check the alerts list below for details.
-          </Typography>
+          🚨 {newAlertsCount} new emergency alert{newAlertsCount > 1 ? 's' : ''} detected!
         </Alert>
       )}
 
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Box sx={{ 
-                p: 2, 
-                borderRadius: 2, 
-                bgcolor: 'error.light',
-                color: 'error.dark',
-                mb: 2,
-                mx: 'auto',
-                width: 'fit-content'
-              }}>
-                <EmergencyIcon sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                {stats.active}
-              </Typography>
-              <Typography variant="h6" color="text.secondary">
-                Active Alerts
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Enhanced Alerts List View */}
+      {sortedAndFilteredAlerts.length === 0 ? (
+        <Paper elevation={0} sx={{ 
+          textAlign: 'center', 
+          py: 8, 
+          bgcolor: '#fff',
+          borderRadius: 3
+        }}>
+          <CheckCircleIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+            No Active Alerts
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            All emergency alerts have been resolved. Great job!
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={fetchAlerts}
+            sx={{ borderRadius: 2 }}
+          >
+            Refresh Alerts
+          </Button>
+        </Paper>
+      ) : (
+        <Paper elevation={0} sx={{ bgcolor: '#fff', borderRadius: 3, overflow: 'hidden' }}>
+          <List sx={{ p: 0 }}>
+            {sortedAndFilteredAlerts.map((alert, index) => {
+              const severityConfig = getSeverityConfig(alert.severity);
+              const statusConfig = getStatusConfig(alert.status);
+              const urgencyLevel = getMaximumUrgencyLevel(alert);
+              const urgencyConfig = getMaximumUrgencyColor(urgencyLevel);
+              const urgencyAnimation = getMaximumUrgencyAnimation(urgencyLevel);
+              const isActive = alert.status === 'active';
+              const isRecent = new Date(alert.created_at).getTime() > Date.now() - 5 * 60 * 1000 && 
+                              alert.status !== 'resolved' && alert.status !== 'closed'; // 5 minutes and not resolved/closed
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Box sx={{ 
-                p: 2, 
-                borderRadius: 2, 
-                bgcolor: 'warning.light',
-                color: 'warning.dark',
-                mb: 2,
-                mx: 'auto',
-                width: 'fit-content'
-              }}>
-                <PeopleIcon sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                {stats.responding}
-              </Typography>
-              <Typography variant="h6" color="text.secondary">
-                Being Responded
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+              return (
+                <Slide direction="up" in={true} timeout={300 + index * 100}>
+                  <ListItem
+                    key={alert.id}
+                    onClick={() => handleAlertClick(alert)}
+                    sx={{
+                      borderLeft: `6px solid ${severityConfig.color}`,
+                      bgcolor: isActive ? `${severityConfig.bgColor}20` : 'transparent',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        bgcolor: isActive ? `${severityConfig.bgColor}40` : `${severityConfig.bgColor}10`,
+                        transform: 'translateX(4px)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                      },
+                      position: 'relative',
+                      ...(isRecent && {
+                        borderLeft: `6px solid ${urgencyConfig.borderColor}`,
+                        bgcolor: `${urgencyConfig.borderColor}10`
+                      })
+                    }}
+                  >
+                    {/* Urgency Indicator */}
+                    {isRecent && alert.status !== 'resolved' && alert.status !== 'closed' && (
+                      <Box sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        background: urgencyConfig.gradientColor,
+                        ...urgencyAnimation
+                      }} />
+                    )}
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Box sx={{ 
-                p: 2, 
-                borderRadius: 2, 
-                bgcolor: 'success.light',
-                color: 'success.dark',
-                mb: 2,
-                mx: 'auto',
-                width: 'fit-content'
-              }}>
-                <CheckCircleIcon sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                {stats.resolved}
-              </Typography>
-              <Typography variant="h6" color="text.secondary">
-                Resolved
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+                    <ListItemAvatar>
+                      <Avatar sx={{ 
+                        bgcolor: severityConfig.color,
+                        border: isActive ? `2px solid ${severityConfig.borderColor}` : 'none'
+                      }}>
+                        {getAlertTypeIcon(alert.alert_type)}
+                      </Avatar>
+                    </ListItemAvatar>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={2}>
-            <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Box sx={{ 
-                p: 2, 
-                borderRadius: 2, 
-                bgcolor: 'info.light',
-                color: 'info.dark',
-                mb: 2,
-                mx: 'auto',
-                width: 'fit-content'
-              }}>
-                <TrendingIcon sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-                {stats.total}
-              </Typography>
-              <Typography variant="h6" color="text.secondary">
-                Total Alerts
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                            {alert.alert_type.toUpperCase()} Alert
+                          </Typography>
+                          <Chip
+                            label={severityConfig.label}
+                            size="small"
+                            sx={{
+                              bgcolor: severityConfig.bgColor,
+                              color: severityConfig.color,
+                              fontWeight: 700,
+                              fontSize: '0.7rem'
+                            }}
+                          />
+                          <Chip
+                            label={statusConfig.label}
+                            size="small"
+                            sx={{
+                              bgcolor: statusConfig.bgColor,
+                              color: statusConfig.color,
+                              fontWeight: 600,
+                              fontSize: '0.7rem'
+                            }}
+                          />
+                          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                              Click to view details
+                            </Typography>
+                            <MapIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                          </Box>
+                        </Box>
+                      }
+                      secondary={
+                        <Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            {alert.description || 'No description provided'}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: '0.75rem' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <TimeIcon sx={{ fontSize: 14 }} />
+                              {formatTimeAgo(alert.created_at)}
+                            </Box>
+                            {alert.location && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <LocationIcon sx={{ fontSize: 14 }} />
+                                Location Available
+                              </Box>
+                            )}
+                          </Box>
+                        </Box>
+                      }
+                    />
 
-      {/* Filters */}
-      <Card elevation={1} sx={{ mb: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <FilterIcon color="primary" />
-            <Typography variant="h6">Filters</Typography>
+                    <ListItemSecondaryAction>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        {/* Status Update Action */}
+                        <Tooltip title="Update Status">
+                          <IconButton
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAlert(alert);
+                              setStatusDialogOpen(true);
+                            }}
+                            sx={{
+                              color: '#1976d2',
+                              '&:hover': { bgcolor: '#1976d220' }
+                            }}
+                          >
+                            <AssignIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                </Slide>
+              );
+            })}
+          </List>
+        </Paper>
+      )}
+
+      {/* Enhanced Map Dialog with Action Buttons */}
+      <Dialog 
+        open={mapDialogOpen} 
+        onClose={() => setMapDialogOpen(false)} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          bgcolor: selectedAlert ? getSeverityConfig(selectedAlert.severity).gradientColor : '#1a1a1a', 
+          color: '#fff',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          p: 3
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {selectedAlert && getAlertTypeIcon(selectedAlert.alert_type)}
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {selectedAlert?.alert_type.toUpperCase()} Alert Details
+            </Typography>
           </Box>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  label="Status"
-                >
-                  <MenuItem value="all">All Statuses</MenuItem>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="responding">Responding</MenuItem>
-                  <MenuItem value="resolved">Resolved</MenuItem>
-                  <MenuItem value="closed">Closed</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Severity</InputLabel>
-                <Select
-                  value={filterSeverity}
-                  onChange={(e) => setFilterSeverity(e.target.value)}
-                  label="Severity"
-                >
-                  <MenuItem value="all">All Severities</MenuItem>
-                  <MenuItem value="critical">Critical</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
-                  <MenuItem value="medium">Medium</MenuItem>
-                  <MenuItem value="low">Low</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Type</InputLabel>
-                <Select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  label="Type"
-                >
-                  <MenuItem value="all">All Types</MenuItem>
-                  <MenuItem value="sos">SOS</MenuItem>
-                  <MenuItem value="medical">Medical</MenuItem>
-                  <MenuItem value="drowning">Drowning</MenuItem>
-                  <MenuItem value="weather">Weather</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Alerts Table */}
-      <AlertsTable 
-        alerts={filteredAlerts}
-        lifeguards={lifeguards}
-        onViewDetails={(alert) => {
-          setSelectedAlert(alert);
-          setDetailDialogOpen(true);
-        }}
-        onUpdateStatus={(alert) => {
-          setSelectedAlert(alert);
-          setStatusDialogOpen(true);
-        }}
-        getAssignedLifeguardName={getAssignedLifeguardName}
-      />
-
-      {/* Alert Details Dialog */}
-      <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Alert Details
           <IconButton
-            onClick={() => setDetailDialogOpen(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
+            onClick={() => setMapDialogOpen(false)}
+            sx={{ color: '#fff' }}
           >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent>
+        
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '70vh' }}>
           {selectedAlert && (
-            <Grid container spacing={3} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>Basic Information</Typography>
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Type</Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                      {getAlertTypeIcon(selectedAlert.alert_type)}
-                      <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
-                        {selectedAlert.alert_type}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Severity</Typography>
-                    <Chip
-                      label={selectedAlert.severity}
-                      color={getSeverityColor(selectedAlert.severity) as any}
-                      size="small"
-                      sx={{ mt: 0.5 }}
-                    />
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Status</Typography>
-                    <Chip
-                      label={selectedAlert.status}
-                      color={getStatusColor(selectedAlert.status) as any}
-                      size="small"
-                      sx={{ mt: 0.5 }}
-                    />
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Reported By</Typography>
-                    <Typography variant="body1">
-                      {selectedAlert.reported_by || 'Anonymous'}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>Details</Typography>
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Description</Typography>
-                    <Typography variant="body1">
-                      {selectedAlert.description || 'No description provided'}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Created</Typography>
-                    <Typography variant="body1">
-                      {formatDate(selectedAlert.created_at)}
-                    </Typography>
-                  </Box>
-                  {selectedAlert.assigned_lifeguard_id && (
+            <>
+              {/* Alert Details Header */}
+              <Paper sx={{ p: 3, bgcolor: '#f8fafc', borderRadius: 0 }}>
+                <Grid container spacing={3} alignItems="center">
+                  <Grid item xs={12} md={6}>
                     <Box>
-                      <Typography variant="body2" color="text.secondary">Assigned To</Typography>
-                      <Typography variant="body1">
-                        {getAssignedLifeguardName(selectedAlert.assigned_lifeguard_id)}
+                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                        {selectedAlert.alert_type.toUpperCase()} Alert
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        {selectedAlert.description || 'No description provided'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        <strong>Reported:</strong> {formatDate(selectedAlert.created_at)}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                        <Chip
+                          label={getSeverityConfig(selectedAlert.severity).label}
+                          sx={{
+                            bgcolor: getSeverityConfig(selectedAlert.severity).bgColor,
+                            color: getSeverityConfig(selectedAlert.severity).color,
+                            fontWeight: 700
+                          }}
+                          size="small"
+                        />
+                        <Chip
+                          label={getStatusConfig(selectedAlert.status).label}
+                          sx={{
+                            bgcolor: getStatusConfig(selectedAlert.status).bgColor,
+                            color: getStatusConfig(selectedAlert.status).color,
+                            fontWeight: 600
+                          }}
+                          size="small"
+                        />
+                      </Box>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      {/* Update Status Button */}
+                      <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<AssignIcon />}
+                        onClick={() => setStatusDialogOpen(true)}
+                        sx={{ 
+                          bgcolor: '#1976d2',
+                          '&:hover': { bgcolor: '#1565c0' },
+                          borderRadius: 2,
+                          px: 4,
+                          py: 1.5,
+                          fontWeight: 700,
+                          fontSize: '1rem'
+                        }}
+                      >
+                        Update Status
+                      </Button>
+
+                      {/* Request Support Button */}
+                      <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<SupportIcon />}
+                        onClick={handleRequestSupport}
+                        sx={{ 
+                          bgcolor: '#f57c00',
+                          '&:hover': { bgcolor: '#e65100' },
+                          borderRadius: 2,
+                          px: 4,
+                          py: 1.5,
+                          fontWeight: 700,
+                          fontSize: '1rem'
+                        }}
+                      >
+                        Request Support
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Map and Details Section */}
+              <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: { xs: 'column', md: 'row' } }}>
+                {/* Map Section */}
+                <Box sx={{ flex: 1, minHeight: 400 }}>
+                  {selectedAlert.location ? (
+                    <BeachMap
+                      alerts={[{
+                        id: selectedAlert.id,
+                        center_id: selectedAlert.center_id,
+                        type: selectedAlert.alert_type as 'sos' | 'medical' | 'weather' | 'safety',
+                        description: selectedAlert.description || 'No description provided',
+                        status: selectedAlert.status === 'responding' ? 'active' : selectedAlert.status as 'active' | 'resolved',
+                        location: {
+                          lat: selectedAlert.location.coordinates[1],
+                          lng: selectedAlert.location.coordinates[0]
+                        },
+                        created_at: selectedAlert.created_at
+                      }]}
+                      center={[selectedAlert.location.coordinates[1], selectedAlert.location.coordinates[0]]}
+                      zoom={16}
+                      showAlerts={true}
+                      showUserLocation={false}
+                      view="street"
+                    />
+                  ) : (
+                    <Box sx={{ 
+                      height: '100%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      bgcolor: '#f5f5f5'
+                    }}>
+                      <Typography variant="body1" color="text.secondary">
+                        No location data available
                       </Typography>
                     </Box>
                   )}
-                  {selectedAlert.resolved_at && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">Resolved</Typography>
-                      <Typography variant="body1">
-                        {formatDate(selectedAlert.resolved_at)}
+                </Box>
+
+                {/* Details Section */}
+                <Box sx={{ width: { xs: '100%', md: 300 }, p: 3, bgcolor: '#fff' }}>
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                    Alert Information
+                  </Typography>
+                  
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <strong>Alert ID:</strong> {selectedAlert.id}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <strong>Status:</strong> {getStatusConfig(selectedAlert.status).label}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <strong>Severity:</strong> {getSeverityConfig(selectedAlert.severity).label}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      <strong>Created:</strong> {formatDate(selectedAlert.created_at)}
+                    </Typography>
+                    {selectedAlert.resolved_at && (
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        <strong>Resolved:</strong> {formatDate(selectedAlert.resolved_at)}
                       </Typography>
-                    </Box>
-                  )}
-                </Stack>
-              </Grid>
-            </Grid>
+                    )}
+                  </Box>
+
+                  {/* Linked Escalations */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                      Linked Escalations ({linkedEscalations.length})
+                    </Typography>
+                    {linkedEscalations.length > 0 ? (
+                      linkedEscalations.map((escalation) => (
+                        <Paper key={escalation.id} sx={{ p: 2, mb: 1, bgcolor: '#f8fafc' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {escalation.escalation_type.replace('_', ' ').toUpperCase()}
+                            </Typography>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEscalationStatusClick(escalation)}
+                              sx={{ ml: 1 }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {escalation.description}
+                          </Typography>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Chip
+                              label={escalation.status.toUpperCase()}
+                              size="small"
+                              color={
+                                escalation.status === 'resolved' ? 'success' :
+                                escalation.status === 'acknowledged' ? 'primary' :
+                                escalation.status === 'responding' ? 'warning' :
+                                'default'
+                              }
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                              {formatTimeAgo(escalation.created_at)}
+                            </Typography>
+                          </Box>
+                        </Paper>
+                      ))
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No linked escalations found for this alert.
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailDialogOpen(false)}>
-            Close
-          </Button>
-          {selectedAlert && selectedAlert.status === 'active' && (
-            <Button
-              variant="contained"
-              onClick={() => {
-                setDetailDialogOpen(false);
-                setStatusDialogOpen(true);
-              }}
-            >
-              Update Status
-            </Button>
-          )}
-        </DialogActions>
       </Dialog>
 
       {/* Status Update Dialog */}
-      <Dialog open={statusDialogOpen} onClose={() => setStatusDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Update Alert Status
-          <IconButton
-            onClick={() => setStatusDialogOpen(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+      <Dialog open={statusDialogOpen} onClose={() => setStatusDialogOpen(false)}>
+        <DialogTitle>Update Alert Status</DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>New Status</InputLabel>
-                <Select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  label="New Status"
-                >
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="responding">Responding</MenuItem>
-                  <MenuItem value="resolved">Resolved</MenuItem>
-                  <MenuItem value="closed">Closed</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>New Status</InputLabel>
+            <Select
+              value={newStatus}
+              label="New Status"
+              onChange={(e) => setNewStatus(e.target.value)}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="responding">Responding</MenuItem>
+              <MenuItem value="resolved">Resolved</MenuItem>
+              <MenuItem value="closed">Closed</MenuItem>
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setStatusDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleStatusUpdate}
+          <Button onClick={() => setStatusDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleStatusUpdate} variant="contained">Update</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Support Request Dialog */}
+      <Dialog open={supportDialogOpen} onClose={() => setSupportDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Request Inter-Center Support</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Request support from other centers for this emergency alert.
+          </Typography>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Target Center Selection */}
+            <FormControl fullWidth>
+              <InputLabel>Target Center *</InputLabel>
+              <Select
+                value={supportFormData.target_center_id}
+                label="Target Center *"
+                onChange={(e) => handleSupportFormChange('target_center_id', e.target.value)}
+              >
+                {centers.map((center) => (
+                  <MenuItem key={center.id} value={center.id}>
+                    {center.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Escalation Linking */}
+            {linkedEscalations.length > 0 && (
+              <FormControl fullWidth>
+                <InputLabel>Link to Escalation (Optional)</InputLabel>
+                <Select
+                  value={supportFormData.escalation_id}
+                  label="Link to Escalation (Optional)"
+                  onChange={(e) => handleSupportFormChange('escalation_id', e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>No escalation linked</em>
+                  </MenuItem>
+                  {linkedEscalations.map((escalation) => (
+                    <MenuItem key={escalation.id} value={escalation.id}>
+                      {escalation.escalation_type.replace('_', ' ').toUpperCase()} - {escalation.status}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            {/* Request Type */}
+            <FormControl fullWidth>
+              <InputLabel>Request Type *</InputLabel>
+              <Select
+                value={supportFormData.request_type}
+                label="Request Type *"
+                onChange={(e) => handleSupportFormChange('request_type', e.target.value)}
+              >
+                <MenuItem value="personnel_support">Personnel Support</MenuItem>
+                <MenuItem value="equipment_support">Equipment Support</MenuItem>
+                <MenuItem value="medical_support">Medical Support</MenuItem>
+                <MenuItem value="evacuation_support">Evacuation Support</MenuItem>
+                <MenuItem value="coordination_support">Coordination Support</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Priority */}
+            <FormControl fullWidth>
+              <InputLabel>Priority *</InputLabel>
+              <Select
+                value={supportFormData.priority}
+                label="Priority *"
+                onChange={(e) => handleSupportFormChange('priority', e.target.value)}
+              >
+                <MenuItem value="low">Low</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="high">High</MenuItem>
+                <MenuItem value="critical">Critical</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Title */}
+            <TextField
+              fullWidth
+              label="Title *"
+              value={supportFormData.title}
+              onChange={(e) => handleSupportFormChange('title', e.target.value)}
+              variant="outlined"
+            />
+
+            {/* Description */}
+            <TextField
+              fullWidth
+              label="Description *"
+              value={supportFormData.description}
+              onChange={(e) => handleSupportFormChange('description', e.target.value)}
+              variant="outlined"
+              multiline
+              rows={4}
+              placeholder="Describe the support needed..."
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSupportDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleSupportRequest} 
             variant="contained"
-            disabled={!newStatus}
+            disabled={!supportFormData.target_center_id || !supportFormData.title || !supportFormData.description}
+          >
+            Request Support
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Escalation Status Update Dialog */}
+      <Dialog open={escalationStatusDialogOpen} onClose={() => setEscalationStatusDialogOpen(false)}>
+        <DialogTitle>Update Escalation Status</DialogTitle>
+        <DialogContent>
+          {selectedEscalation && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                <strong>Escalation Type:</strong> {selectedEscalation.escalation_type.replace('_', ' ').toUpperCase()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                <strong>Current Status:</strong> {selectedEscalation.status.toUpperCase()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                <strong>Description:</strong> {selectedEscalation.description}
+              </Typography>
+            </Box>
+          )}
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>New Status</InputLabel>
+            <Select
+              value={newEscalationStatus}
+              label="New Status"
+              onChange={(e) => setNewEscalationStatus(e.target.value)}
+            >
+              <MenuItem value="acknowledged">Acknowledged</MenuItem>
+              <MenuItem value="responding">Responding</MenuItem>
+              <MenuItem value="resolved">Resolved</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEscalationStatusDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleEscalationStatusUpdate} 
+            variant="contained"
+            disabled={!newEscalationStatus}
           >
             Update Status
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* WebSocket connection and real-time updates */}
+      <Box sx={{ position: 'fixed', bottom: 16, right: 16 }}>
+        <Tooltip title={socketConnected ? 'Real-time updates connected' : 'Real-time updates disconnected'}>
+          <Avatar sx={{ 
+            bgcolor: socketConnected ? '#4caf50' : '#f44336',
+            width: 48,
+            height: 48
+          }}>
+            {socketConnected ? <CheckCircleIcon /> : <ErrorIcon />}
+          </Avatar>
+        </Tooltip>
+      </Box>
     </Box>
-  );
-};
-
-// Alerts Table Component
-interface AlertsTableProps {
-  alerts: EmergencyAlert[];
-  lifeguards: Lifeguard[];
-  onViewDetails: (alert: EmergencyAlert) => void;
-  onUpdateStatus: (alert: EmergencyAlert) => void;
-  getAssignedLifeguardName: (lifeguardId: string) => string;
-}
-
-const AlertsTable: React.FC<AlertsTableProps> = ({
-  alerts,
-  lifeguards,
-  onViewDetails,
-  onUpdateStatus,
-  getAssignedLifeguardName
-}) => {
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'error';
-      case 'high': return 'warning';
-      case 'medium': return 'info';
-      case 'low': return 'success';
-      default: return 'default';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'error';
-      case 'responding': return 'warning';
-      case 'resolved': return 'success';
-      case 'closed': return 'default';
-      default: return 'default';
-    }
-  };
-
-  const getAlertTypeIcon = (type: string) => {
-    switch (type) {
-      case 'sos': return <EmergencyIcon />;
-      case 'medical': return <MedicalIcon />;
-      case 'drowning': return <WarningIcon />;
-      case 'weather': return <InfoIcon />;
-      default: return <EmergencyIcon />;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
-      return date.toLocaleString();
-    } catch (error) {
-      return 'Invalid Date';
-    }
-  };
-
-  if (alerts.length === 0) {
-    return (
-      <Card>
-        <CardContent sx={{ textAlign: 'center', py: 4 }}>
-          <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-          <Typography variant="h6" gutterBottom>
-            No Alerts Found
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            No alerts match the current filters.
-          </Typography>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Type</TableCell>
-            <TableCell>Severity</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Assigned To</TableCell>
-            <TableCell>Description</TableCell>
-            <TableCell>Created</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {alerts.map((alert) => (
-            <TableRow key={alert.id} sx={{ 
-              bgcolor: alert.status === 'active' ? 'error.light' : 'inherit',
-              '&:hover': { bgcolor: 'action.hover' }
-            }}>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {getAlertTypeIcon(alert.alert_type)}
-                  <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
-                    {alert.alert_type}
-                  </Typography>
-                </Box>
-              </TableCell>
-              <TableCell>
-                <Chip
-                  label={alert.severity}
-                  color={getSeverityColor(alert.severity) as any}
-                  size="small"
-                />
-              </TableCell>
-              <TableCell>
-                <Chip
-                  label={alert.status}
-                  color={getStatusColor(alert.status) as any}
-                  size="small"
-                />
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2">
-                  {alert.assigned_lifeguard_id 
-                    ? getAssignedLifeguardName(alert.assigned_lifeguard_id)
-                    : 'Unassigned'
-                  }
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2" sx={{ maxWidth: 200 }}>
-                  {alert.description || 'No description provided'}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2">
-                  {formatDate(alert.created_at)}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Tooltip title="View Details">
-                    <IconButton
-                      size="small"
-                      onClick={() => onViewDetails(alert)}
-                    >
-                      <ViewIcon />
-                    </IconButton>
-                  </Tooltip>
-                  {alert.status === 'active' && (
-                    <Tooltip title="Update Status">
-                      <IconButton
-                        size="small"
-                        color="warning"
-                        onClick={() => onUpdateStatus(alert)}
-                      >
-                        <ScheduleIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
   );
 };
 

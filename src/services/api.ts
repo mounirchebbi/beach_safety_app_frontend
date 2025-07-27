@@ -114,6 +114,11 @@ class ApiService {
     return response.data.data;
   }
 
+  async getOtherCenters(): Promise<Center[]> {
+    const response: AxiosResponse<PaginatedResponse<Center>> = await this.api.get('/api/v1/centers/others');
+    return response.data.data;
+  }
+
   async getCenterById(id: string): Promise<Center> {
     const response: AxiosResponse<ApiResponse<Center>> = await this.api.get(`/api/v1/centers/${id}`);
     return response.data.data!;
