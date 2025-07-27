@@ -700,6 +700,11 @@ class ApiService {
     return response.data;
   }
 
+  async getIncomingSupportRequestsCount(): Promise<number> {
+    const response: AxiosResponse<ApiResponse<{ count: number }>> = await this.api.get('/api/v1/inter-center-support/incoming/count');
+    return response.data.data!.count;
+  }
+
   async getOutgoingSupportRequests(page: number = 1, limit: number = 10): Promise<{
     data: any[];
     pagination: {

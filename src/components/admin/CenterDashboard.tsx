@@ -43,7 +43,8 @@ import {
   Flag as FlagIcon,
   DoNotDisturb as DoNotDisturbIcon,
   Map as MapIcon,
-  CallMerge as EscalationIcon
+  CallMerge as EscalationIcon,
+  Support as SupportIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -59,6 +60,7 @@ interface CenterStats {
   activeShifts: number;
   activeAlerts: number;
   activeEscalations: number;
+  incomingSupportRequests: number;
   currentFlag: SafetyFlag | null;
   lastWeatherUpdate: WeatherData | null;
   totalLifeguards: number;
@@ -75,6 +77,7 @@ const CenterDashboard: React.FC = () => {
     activeShifts: 0,
     activeAlerts: 0,
     activeEscalations: 0,
+    incomingSupportRequests: 0,
     currentFlag: null,
     lastWeatherUpdate: null,
     totalLifeguards: 0,
@@ -204,6 +207,26 @@ const CenterDashboard: React.FC = () => {
     }
   }, []);
 
+  // Efficient function to update just the support requests count
+  const updateSupportRequestsCount = useCallback(async (centerId: string | undefined) => {
+    if (!centerId) return;
+    
+    try {
+      setUpdatingStats(true);
+      
+      const count = await apiService.getIncomingSupportRequestsCount();
+      
+      setStats(prev => ({
+        ...prev,
+        incomingSupportRequests: count
+      }));
+    } catch (err) {
+      console.error('Error updating support requests count:', err);
+    } finally {
+      setUpdatingStats(false);
+    }
+  }, []);
+
   // Efficient function to update just the safety flag stats
   const updateSafetyFlagStats = useCallback(async (centerId: string | undefined) => {
     if (!centerId) return;
@@ -276,6 +299,16 @@ const CenterDashboard: React.FC = () => {
         updateEscalationsCount(user?.center_info?.id);
       });
 
+      // Listen for new inter-center support requests
+      socket.on('new_inter_center_support', (data) => {
+        updateSupportRequestsCount(user?.center_info?.id);
+      });
+
+      // Listen for inter-center support status updates
+      socket.on('inter_center_support_status_updated', (data) => {
+        updateSupportRequestsCount(user?.center_info?.id);
+      });
+
       // Listen for weather updates
       socketService.onWeatherUpdate((data) => {
         if (data.center_id === user?.center_info?.id) {
@@ -330,6 +363,8 @@ const CenterDashboard: React.FC = () => {
         socket.off('test_emergency_alert');
         socket.off('new_escalation');
         socket.off('escalation_status_updated');
+        socket.off('new_inter_center_support');
+        socket.off('inter_center_support_status_updated');
         socketService.disconnect();
         setSocketConnected(false);
       };
@@ -345,11 +380,12 @@ const CenterDashboard: React.FC = () => {
       const interval = setInterval(() => {
         updateAlertsCount(user?.center_info?.id);
         updateEscalationsCount(user?.center_info?.id);
+        updateSupportRequestsCount(user?.center_info?.id);
       }, 30000); // 30 seconds
 
       return () => clearInterval(interval);
     }
-  }, [user?.center_info?.id, updateAlertsCount, updateEscalationsCount]);
+  }, [user?.center_info?.id, updateAlertsCount, updateEscalationsCount, updateSupportRequestsCount]);
 
   useEffect(() => {
     loadDashboardData();
@@ -410,6 +446,14 @@ const CenterDashboard: React.FC = () => {
         console.log('No escalation data available');
       }
 
+      // Load incoming support requests
+      let incomingSupportRequests = 0;
+      try {
+        incomingSupportRequests = await apiService.getIncomingSupportRequestsCount();
+      } catch (err) {
+        console.log('No support requests data available');
+      }
+
       // Load current safety flag - use most recent non-expired flag from history
       let currentFlag = null;
       try {
@@ -443,6 +487,7 @@ const CenterDashboard: React.FC = () => {
         activeShifts,
         activeAlerts,
         activeEscalations,
+        incomingSupportRequests,
         currentFlag,
         lastWeatherUpdate,
         totalLifeguards: centerLifeguards.length,
@@ -1172,6 +1217,99 @@ const CenterDashboard: React.FC = () => {
                     {stats.activeEscalations > 0 
                       ? 'Click to view and manage active escalation alerts'
                       : 'Click to view escalation alerts history and management'
+                    }
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Inter-Center Support - Critical Information */}
+        <Grid item xs={12} lg={12}>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              height: '100%',
+              background: stats.incomingSupportRequests > 0 ? 'linear-gradient(135deg, #2196f3 0%, #42a5f5 100%)' : 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: 4
+              }
+            }}
+            onClick={() => navigate('/admin/inter-center-support')}
+          >
+            {/* Real-time indicator */}
+            <Box sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5
+            }}>
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: socketConnected ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
+                animation: socketConnected ? 'pulse 2s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%': { opacity: 1 },
+                  '50%': { opacity: 0.5 },
+                  '100%': { opacity: 1 }
+                }
+              }} />
+              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem' }}>
+                {socketConnected ? 'Live' : 'Offline'}
+              </Typography>
+            </Box>
+
+            <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <Badge badgeContent={stats.incomingSupportRequests} color="info" max={99}>
+                  <Box sx={{ 
+                    p: 1.5, 
+                    borderRadius: 2, 
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: 'white'
+                  }}>
+                    <SupportIcon sx={{ fontSize: 28 }} />
+                  </Box>
+                </Badge>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    Inter-Center Support
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    {stats.incomingSupportRequests > 0 ? 'Incoming support requests require attention' : 'All clear - no incoming support requests'}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
+                <Typography variant="h2" sx={{ fontWeight: 700, mb: 1 }}>
+                  {stats.incomingSupportRequests}
+                </Typography>
+                <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+                  {stats.incomingSupportRequests === 1 ? 'Incoming Request' : 'Incoming Requests'}
+                </Typography>
+                
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    {stats.incomingSupportRequests > 0 
+                      ? 'Click to view and manage incoming support requests'
+                      : 'Click to view inter-center support management'
                     }
                   </Typography>
                 </Box>
