@@ -42,7 +42,8 @@ import {
   WbSunny,
   Flag as FlagIcon,
   DoNotDisturb as DoNotDisturbIcon,
-  Map as MapIcon
+  Map as MapIcon,
+  CallMerge as EscalationIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -50,13 +51,14 @@ import WeatherWidget from '../weather/WeatherWidget';
 import WeatherAlerts from '../weather/WeatherAlerts';
 import { apiService } from '../../services/api';
 import { socketService } from '../../services/socket';
-import { Center, EmergencyAlert, SafetyFlag, WeatherData, SafetyZone } from '../../types';
+import { Center, EmergencyAlert, SafetyFlag, WeatherData, SafetyZone, EmergencyEscalation } from '../../types';
 import BeachMap from '../map/BeachMap';
 
 interface CenterStats {
   activeLifeguards: number;
   activeShifts: number;
   activeAlerts: number;
+  activeEscalations: number;
   currentFlag: SafetyFlag | null;
   lastWeatherUpdate: WeatherData | null;
   totalLifeguards: number;
@@ -72,6 +74,7 @@ const CenterDashboard: React.FC = () => {
     activeLifeguards: 0,
     activeShifts: 0,
     activeAlerts: 0,
+    activeEscalations: 0,
     currentFlag: null,
     lastWeatherUpdate: null,
     totalLifeguards: 0,
@@ -85,6 +88,7 @@ const CenterDashboard: React.FC = () => {
   const [socketConnected, setSocketConnected] = useState(false);
   const [updatingStats, setUpdatingStats] = useState(false);
   const [showAlertNotification, setShowAlertNotification] = useState(false);
+  const [showEscalationNotification, setShowEscalationNotification] = useState(false);
   const [safetyZones, setSafetyZones] = useState<SafetyZone[]>([]);
   const [rateLimitEnabled, setRateLimitEnabled] = useState<boolean | null>(null);
   const [rateLimitSaving, setRateLimitSaving] = useState(false);
@@ -177,6 +181,29 @@ const CenterDashboard: React.FC = () => {
     }
   }, []);
 
+  // Efficient function to update just the escalations count
+  const updateEscalationsCount = useCallback(async (centerId: string | undefined) => {
+    if (!centerId) return;
+    
+    try {
+      setUpdatingStats(true);
+      
+      const escalations = await apiService.getCenterEscalations(1, 100);
+      const pendingEscalations = escalations.data.filter((escalation: EmergencyEscalation) => 
+        escalation.status === 'pending' || escalation.status === 'acknowledged'
+      );
+      
+      setStats(prev => ({
+        ...prev,
+        activeEscalations: pendingEscalations.length
+      }));
+    } catch (err) {
+      console.error('Error updating escalations count:', err);
+    } finally {
+      setUpdatingStats(false);
+    }
+  }, []);
+
   // Efficient function to update just the safety flag stats
   const updateSafetyFlagStats = useCallback(async (centerId: string | undefined) => {
     if (!centerId) return;
@@ -236,6 +263,19 @@ const CenterDashboard: React.FC = () => {
         updateAlertsCount(user?.center_info?.id);
       });
 
+      // Listen for new escalations
+      socket.on('new_escalation', (data) => {
+        updateEscalationsCount(user?.center_info?.id);
+        setShowEscalationNotification(true);
+        // Auto-hide notification after 5 seconds
+        setTimeout(() => setShowEscalationNotification(false), 5000);
+      });
+
+      // Listen for escalation status updates
+      socket.on('escalation_status_updated', (data) => {
+        updateEscalationsCount(user?.center_info?.id);
+      });
+
       // Listen for weather updates
       socketService.onWeatherUpdate((data) => {
         if (data.center_id === user?.center_info?.id) {
@@ -288,6 +328,8 @@ const CenterDashboard: React.FC = () => {
         socketService.offSafetyFlagUpdated();
         socketService.offSafetyZoneUpdated(); // Added offSafetyZoneUpdated
         socket.off('test_emergency_alert');
+        socket.off('new_escalation');
+        socket.off('escalation_status_updated');
         socketService.disconnect();
         setSocketConnected(false);
       };
@@ -302,11 +344,12 @@ const CenterDashboard: React.FC = () => {
     if (user?.center_info?.id) {
       const interval = setInterval(() => {
         updateAlertsCount(user?.center_info?.id);
+        updateEscalationsCount(user?.center_info?.id);
       }, 30000); // 30 seconds
 
       return () => clearInterval(interval);
     }
-  }, [user?.center_info?.id, updateAlertsCount]);
+  }, [user?.center_info?.id, updateAlertsCount, updateEscalationsCount]);
 
   useEffect(() => {
     loadDashboardData();
@@ -355,6 +398,18 @@ const CenterDashboard: React.FC = () => {
       const centerAlerts = alerts.filter((alert: EmergencyAlert) => alert.center_id === centerId);
       const activeAlerts = centerAlerts.filter((alert: EmergencyAlert) => alert.status === 'active').length;
 
+      // Load escalations
+      let activeEscalations = 0;
+      try {
+        const escalations = await apiService.getCenterEscalations(1, 100);
+        const pendingEscalations = escalations.data.filter((escalation: EmergencyEscalation) => 
+          escalation.status === 'pending' || escalation.status === 'acknowledged'
+        );
+        activeEscalations = pendingEscalations.length;
+      } catch (err) {
+        console.log('No escalation data available');
+      }
+
       // Load current safety flag - use most recent non-expired flag from history
       let currentFlag = null;
       try {
@@ -387,6 +442,7 @@ const CenterDashboard: React.FC = () => {
         activeLifeguards,
         activeShifts,
         activeAlerts,
+        activeEscalations,
         currentFlag,
         lastWeatherUpdate,
         totalLifeguards: centerLifeguards.length,
@@ -529,6 +585,21 @@ const CenterDashboard: React.FC = () => {
           }
         >
           New emergency alert received! Please respond immediately.
+        </Alert>
+      )}
+
+      {showEscalationNotification && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 3 }} 
+          onClose={() => setShowEscalationNotification(false)}
+          action={
+            <Button color="inherit" size="small" onClick={() => navigate('/admin/escalations')}>
+              View Escalations
+            </Button>
+          }
+        >
+          New escalation alert received from lifeguard! Please review immediately.
         </Alert>
       )}
 
@@ -1008,6 +1079,99 @@ const CenterDashboard: React.FC = () => {
                     {stats.activeAlerts > 0 
                       ? 'Click to view and manage active emergency alerts'
                       : 'Click to view emergency alerts history and management'
+                    }
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Escalation Alerts - Critical Information */}
+        <Grid item xs={12} lg={12}>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              height: '100%',
+              background: stats.activeEscalations > 0 ? 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)' : 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: 4
+              }
+            }}
+            onClick={() => navigate('/admin/escalations')}
+          >
+            {/* Real-time indicator */}
+            <Box sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5
+            }}>
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: socketConnected ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
+                animation: socketConnected ? 'pulse 2s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%': { opacity: 1 },
+                  '50%': { opacity: 0.5 },
+                  '100%': { opacity: 1 }
+                }
+              }} />
+              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem' }}>
+                {socketConnected ? 'Live' : 'Offline'}
+              </Typography>
+            </Box>
+
+            <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <Badge badgeContent={stats.activeEscalations} color="warning" max={99}>
+                  <Box sx={{ 
+                    p: 1.5, 
+                    borderRadius: 2, 
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: 'white'
+                  }}>
+                    <EscalationIcon sx={{ fontSize: 28 }} />
+                  </Box>
+                </Badge>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    Escalation Alerts
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    {stats.activeEscalations > 0 ? 'Active escalations require attention' : 'All clear - no active escalations'}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
+                <Typography variant="h2" sx={{ fontWeight: 700, mb: 1 }}>
+                  {stats.activeEscalations}
+                </Typography>
+                <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+                  {stats.activeEscalations === 1 ? 'Active Escalation' : 'Active Escalations'}
+                </Typography>
+                
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: 'rgba(255,255,255,0.1)', 
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    {stats.activeEscalations > 0 
+                      ? 'Click to view and manage active escalation alerts'
+                      : 'Click to view escalation alerts history and management'
                     }
                   </Typography>
                 </Box>
