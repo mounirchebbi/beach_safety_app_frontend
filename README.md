@@ -2,7 +2,7 @@
 
 A modern React TypeScript frontend for the Beach Safety Management System with Material-UI and real-time features.
 
-## 🚀 Features
+##  Features
 
 ### Authentication & Authorization
 - **Role-based Access Control**: Three user roles (Lifeguard, Center Admin, System Admin)
@@ -27,7 +27,7 @@ A modern React TypeScript frontend for the Beach Safety Management System with M
 - **Custom Hooks**: Reusable logic for common operations
 - **Context API**: Global state management for authentication
 
-## 🛠 Tech Stack
+##  Tech Stack
 
 - **React 18** with TypeScript
 - **Material-UI v5** for UI components
@@ -38,48 +38,48 @@ A modern React TypeScript frontend for the Beach Safety Management System with M
 - **React Query** for data fetching
 - **Date-fns** for date manipulation
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 src/
-├── components/
-│   ├── auth/                 # Authentication components
-│   │   ├── LoginPage.tsx
-│   │   └── RegisterPage.tsx
-│   ├── common/               # Shared components
-│   │   ├── Layout.tsx
-│   │   └── LoadingScreen.tsx
-│   ├── public/               # Public dashboard
-│   │   └── PublicDashboard.tsx
-│   ├── lifeguard/            # Lifeguard-specific components
-│   │   ├── LifeguardDashboard.tsx
-│   │   ├── ShiftManagement.tsx
-│   │   ├── EmergencyAlerts.tsx
-│   │   └── IncidentReports.tsx
-│   ├── admin/                # Center admin components
-│   │   ├── CenterDashboard.tsx
-│   │   ├── CenterManagement.tsx
-│   │   ├── LifeguardManagement.tsx
-│   │   ├── ShiftScheduling.tsx
-│   │   └── SafetyManagement.tsx
-│   └── system-admin/         # System admin components
-│       ├── SystemDashboard.tsx
-│       ├── SystemCenterManagement.tsx
-│       ├── SystemUserManagement.tsx
-│       └── SystemReports.tsx
-├── context/
-│   └── AuthContext.tsx       # Authentication context
-├── services/
-│   ├── api.ts               # API service layer
-│   └── socket.ts            # Socket.io service
-├── types/
-│   └── index.ts             # TypeScript type definitions
-├── hooks/                   # Custom hooks (future)
-├── utils/                   # Utility functions (future)
-└── App.tsx                  # Main application component
+ components/
+    auth/                 # Authentication components
+       LoginPage.tsx
+       RegisterPage.tsx
+    common/               # Shared components
+       Layout.tsx
+       LoadingScreen.tsx
+    public/               # Public dashboard
+       PublicDashboard.tsx
+    lifeguard/            # Lifeguard-specific components
+       LifeguardDashboard.tsx
+       ShiftManagement.tsx
+       EmergencyAlerts.tsx
+       IncidentReports.tsx
+    admin/                # Center admin components
+       CenterDashboard.tsx
+       CenterManagement.tsx
+       LifeguardManagement.tsx
+       ShiftScheduling.tsx
+       SafetyManagement.tsx
+    system-admin/         # System admin components
+        SystemDashboard.tsx
+        SystemCenterManagement.tsx
+        SystemUserManagement.tsx
+        SystemReports.tsx
+ context/
+    AuthContext.tsx       # Authentication context
+ services/
+    api.ts               # API service layer
+    socket.ts            # Socket.io service
+ types/
+    index.ts             # TypeScript type definitions
+ hooks/                   # Custom hooks (future)
+ utils/                   # Utility functions (future)
+ App.tsx                  # Main application component
 ```
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 - Node.js 16+ 
@@ -109,7 +109,7 @@ Create a `.env` file in the frontend directory:
 REACT_APP_API_URL=http://localhost:5000
 ```
 
-## 🔐 Authentication Flow
+##  Authentication Flow
 
 1. **Public Access**: Users can view the public dashboard
 2. **Login/Register**: Users authenticate with email/password
@@ -118,7 +118,7 @@ REACT_APP_API_URL=http://localhost:5000
    - Center Admins → `/admin`
    - System Admins → `/system`
 
-## 🎨 UI Components
+##  UI Components
 
 ### Layout System
 - **AppBar**: Top navigation with user menu
@@ -135,7 +135,7 @@ REACT_APP_API_URL=http://localhost:5000
 - **Role-specific Dashboards**: Tailored interfaces for each user type
 - **Statistics Cards**: Key metrics and system status
 
-## 🔌 API Integration
+##  API Integration
 
 ### Service Layer
 - **API Service**: Centralized API communication
@@ -163,7 +163,7 @@ REACT_APP_API_URL=http://localhost:5000
 - **Prettier**: Code formatting
 - **Material-UI**: Consistent design system
 
-## 🔧 Configuration
+##  Configuration
 
 ### Theme Customization
 
@@ -178,7 +178,7 @@ The app uses a custom Material-UI theme with:
 - **Protected Routes**: Role-based access control
 - **404 Handling**: Automatic redirects based on user role
 
-## 🚀 Deployment
+##  Deployment
 
 ### Build for Production
 
@@ -194,7 +194,7 @@ Ensure the backend API URL is correctly configured for production:
 REACT_APP_API_URL=https://your-api-domain.com
 ```
 
-## 🔗 Integration with Backend
+##  Integration with Backend
 
 The frontend integrates with the backend API through:
 
@@ -203,7 +203,7 @@ The frontend integrates with the backend API through:
 3. **JWT Authentication**: Secure token-based auth
 4. **CORS**: Cross-origin resource sharing
 
-## 📱 Responsive Design
+##  Responsive Design
 
 The application is fully responsive with:
 - **Mobile-first approach**
@@ -211,7 +211,7 @@ The application is fully responsive with:
 - **Touch-friendly interfaces**
 - **Optimized navigation for mobile**
 
-## 🔮 Future Enhancements
+##  Future Enhancements
 
 - **Interactive Maps**: Leaflet integration for location tracking
 - **Real-time Charts**: Weather and safety data visualization
@@ -228,6 +228,6 @@ The application is fully responsive with:
 4. Add proper error handling
 5. Test thoroughly before submitting
 
-## 📄 License
+##  License
 
 This project is part of the Beach Safety Management System.

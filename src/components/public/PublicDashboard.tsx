@@ -1197,7 +1197,7 @@ const PublicDashboard: React.FC = () => {
                 {locationError}
               </Typography>
               <Typography variant="caption" sx={{ mb: 2, display: 'block', color: 'text.secondary' }}>
-                💡 Tip: You can still use the map by clicking anywhere to set your location manually.
+                 Tip: You can still use the map by clicking anywhere to set your location manually.
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Button

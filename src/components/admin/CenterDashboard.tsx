@@ -822,7 +822,7 @@ const CenterDashboard: React.FC = () => {
                                 justifyContent: 'center'
                               }}>
                                 <Typography variant="caption" sx={{ color: 'white', fontSize: '0.6rem' }}>
-                                  👁
+                                  
                                 </Typography>
                               </Box>
                               <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -1133,7 +1133,7 @@ const CenterDashboard: React.FC = () => {
         </Grid>
 
         {/* Escalation Alerts - Critical Information */}
-        <Grid item xs={12} lg={12}>
+        <Grid item xs={12} lg={6}>
           <Card 
             elevation={2} 
             sx={{ 
@@ -1226,7 +1226,7 @@ const CenterDashboard: React.FC = () => {
         </Grid>
 
         {/* Inter-Center Support - Critical Information */}
-        <Grid item xs={12} lg={12}>
+        <Grid item xs={12} lg={6}>
           <Card 
             elevation={2} 
             sx={{ 

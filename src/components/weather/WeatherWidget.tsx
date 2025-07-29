@@ -354,7 +354,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ centerId, centerName }) =
                 justifyContent: 'center',
                 alignItems: 'center'
               }}>
-                <Box sx={{ fontSize: 20, color: 'white', mb: 0.5 }}>🌊</Box>
+                <Box sx={{ fontSize: 20, color: 'white', mb: 0.5 }}></Box>
                 <Typography variant="caption" sx={{ opacity: 0.8, display: 'block', mb: 0.5 }}>
                   Waves
                 </Typography>

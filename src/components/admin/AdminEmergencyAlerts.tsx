@@ -764,7 +764,7 @@ const AdminEmergencyAlerts: React.FC = () => {
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {activeAlerts.length > 0 
-                  ? `🚨 ${activeAlerts.length} active emergency${activeAlerts.length > 1 ? 's' : ''} requiring immediate attention`
+                  ? ` ${activeAlerts.length} active emergency${activeAlerts.length > 1 ? 's' : ''} requiring immediate attention`
                   : 'Real-time emergency response management for center administrators'
                 }
               </Typography>
@@ -849,7 +849,7 @@ const AdminEmergencyAlerts: React.FC = () => {
             </Button>
           }
         >
-          🚨 {newAlertsCount} new emergency alert{newAlertsCount > 1 ? 's' : ''} detected!
+           {newAlertsCount} new emergency alert{newAlertsCount > 1 ? 's' : ''} detected!
         </Alert>
       )}
 

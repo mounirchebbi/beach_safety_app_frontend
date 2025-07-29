@@ -521,12 +521,12 @@ const ShiftScheduling: React.FC = () => {
                           <Box>
                             {shift.check_in_time && (
                               <Typography variant="body2" color="success.main">
-                                ✓ In: {format(parseISO(shift.check_in_time), 'HH:mm')}
+                                 In: {format(parseISO(shift.check_in_time), 'HH:mm')}
                               </Typography>
                             )}
                             {shift.check_out_time && (
                               <Typography variant="body2" color="info.main">
-                                ✓ Out: {format(parseISO(shift.check_out_time), 'HH:mm')}
+                                 Out: {format(parseISO(shift.check_out_time), 'HH:mm')}
                               </Typography>
                             )}
                             {!shift.check_in_time && shift.status === 'scheduled' && (
